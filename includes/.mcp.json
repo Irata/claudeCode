@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "task-master-ai": {
+      "command": "node",
+      "args": [
+        "E:\\PROJECTS\\taskmaster-ai/index.js"
+      ],
+      "cwd": "E:\\PROJECTS\\taskmaster-ai",
+      "env": {
+        "ANTHROPIC_API_KEY": "XXXXX"
+      }
+    },
+    "Context7": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "serena": {
+      "command": "P:/python/astral/bin/uv.exe",
+      "args": ["run", "--directory", "E:/MCP_Servers/serena", "serena-mcp-server", "E:/MCP_Servers/serena/.serena/project.yml"],
+      "cwd": "E:/MCP_Servers/serena"
+    },
+    "sequential-thinking": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    }
+  }
+}

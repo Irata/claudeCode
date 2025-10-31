@@ -1,0 +1,30 @@
+{
+  "name": "database-connection-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for managing project-specific database connections",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "crypto": "*",
+    "fs": "*",
+    "path": "*",
+    "mysql2": "^3.11.0"
+  },
+  "keywords": [
+    "mcp",
+    "database",
+    "connections",
+    "joomla",
+    "mysql",
+    "db",
+    "postgresql"
+  ],
+  "author": "New Line Web Design",
+  "license": "MIT"
+}

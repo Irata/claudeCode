@@ -1,0 +1,172 @@
+{
+  "mcpServers": {
+    "task-master-ai": {
+      "command": "node",
+      "args": ["E:\\PROJECTS\\taskmaster-ai/index.js"],
+      "cwd": "E:\\PROJECTS\\taskmaster-ai",
+      "env": {
+        "ANTHROPIC_API_KEY": "XXXXX"
+      }
+    },
+    "Joomla Articles MCP": {
+      "command": "E:/PROJECTS/PYTHON/Scripts/uv.exe",
+      "args": [
+        "run",
+        "--directory",
+        "E:/PROJECTS/joomla-mcp-server",
+        "main.py"
+      ],
+      "env": {
+        "JOOMLA_BASE_URL": "https://umarex.clientdevsites.com/",
+        "BEARER_TOKEN": "XXXXX"
+      }
+    },
+    "Context7": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+    },
+	"sequential-thinking": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "deepl": {
+      "command": "node",
+      "args": ["E:/PROJECTS/deepl-mcp-server/src/index.mjs"],
+      "cwd": "E:/PROJECTS/deepl-mcp-server",
+      "env": {
+        "DEEPL_API_KEY": "XXXXXX"
+      }
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"]
+    },
+    "browser-tools": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@agentdeskai/browser-tools-mcp@1.2.0"]
+    },
+    "mcp-server-firecrawl": {
+      "command": "cmd",
+      "args": ["/c","npx","-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "XXXXXX",
+        "FIRECRAWL_RETRY_MAX_ATTEMPTS": "5",
+        "FIRECRAWL_RETRY_INITIAL_DELAY": "2000",
+        "FIRECRAWL_RETRY_MAX_DELAY": "30000",
+        "FIRECRAWL_RETRY_BACKOFF_FACTOR": "3",
+        "FIRECRAWL_CREDIT_WARNING_THRESHOLD": "2000",
+        "FIRECRAWL_CREDIT_CRITICAL_THRESHOLD": "500"
+      }
+    },	
+	  "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "XXXXX"
+      }
+    },
+    "knowledge-graph": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y", "mcp-knowledge-graph",
+        "--memory-path", "E:/PROJECTS/knowledge-graph-memory.jsonl"
+      ],
+      "autoapprove": [
+        "create_entities",
+        "create_relations",
+        "add_observations",
+        "delete_entities",
+        "delete_observations",
+        "delete_relations",
+        "read_graph",
+        "search_nodes",
+        "open_nodes"
+      ]
+    },
+	"postman-api": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y", "mcp-remote",
+        "https://mcp.postman-beta.com/mcp",
+        "--header",
+        "Authorization: Bearer XXXXXXX"
+      ]
+    },
+    "kreuzberg-mcp": {
+      "command": "E:/PROJECTS/PYTHON/Scripts/uvx.exe",
+      "args": ["--from", "kreuzberg[all]", "kreuzberg-mcp"]
+    },
+    "md-pdf-mcp": {
+      "command": "E:/PROJECTS/PYTHON/Scripts/uv.exe",
+      "args": [
+        "run",
+        "--directory",       
+        "E:/PROJECTS/md-pdf-mcp-server",
+        "md-pdf-mcp"
+      ]
+    },
+	"lara": {
+      "command": "cmd",
+      "args": [
+        "/c", "npx", "-y", "mcp-remote",
+        "https://mcp.laratranslate.com/v1",
+        "--header",
+        "x-lara-access-key-id: XXXXX",
+        "--header",
+        "x-lara-access-key-secret: XXXXXX"
+      ]
+    },
+    "database-connections": {
+      "command": "node",
+      "args": ["E:\\PROJECTS\\database-connection-mcp\\index.js"],
+      "env": {
+        "DB_ENCRYPTION_KEY": "XXXXXX"
+      }
+    },
+    "ai-humanizer": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "ai-humanizer-mcp-server"]
+    },
+    "markdownify": {
+      "command": "node",
+      "args": ["E:/PROJECTS/markdownify-mcp/dist/index.js"],
+      "env": {
+        "UV_PATH": "E:/PROJECTS/PYTHON/Scripts/uv.exe",
+        "MD_SHARE_DIR": "E:/PROJECTS/DOCUMENTS"
+      }
+    },
+    "ppts": {
+      "command": "E:/PROJECTS/PYTHON/Scripts/uv.exe",
+      "args": [
+        "run",
+        "--directory",
+        "E:/PROJECTS/PPT_MCP_Server",
+        "main.py"
+      ]
+    },
+    "image-processing": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "image-processing-mcp-server"]
+    },
+    "image-downloader": {
+      "command": "node",
+      "args": ["E:/PROJECTS/mcp-image-downloader/build/index.js"],
+      "cwd": "E:/PROJECTS/mcp-image-downloader"
+    },
+    "serena": {
+      "command": "E:/PROJECTS/PYTHON/Scripts/uv.exe",
+      "args": ["run", "--directory", "E:/PROJECTS/serena", "serena-mcp-server", "E:/PROJECTS/serena/.serena/project.yml"],
+      "cwd": "E:/PROJECTS/serena"
+    }
+  }
+}

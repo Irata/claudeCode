@@ -10,6 +10,14 @@ REM   6. Provides progress feedback and error handling
 REM   7. Shows a summary of created links
 REM   The batch file includes error checking for missing directories and handles existing links gracefully.
 
+REM --- Check for Administrator privileges and self-elevate if needed ---
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Requesting Administrator privileges...
+    powershell -Command "Start-Process -Verb RunAs -FilePath '%~f0'"
+    exit /b
+)
+
 REM Prompt for PHPStorm project name
 set /p PROJECT_NAME="Enter PHPStorm project name: "
 

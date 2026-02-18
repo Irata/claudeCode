@@ -18,6 +18,7 @@
 │   │   │   ├── Extension/
 │   │   │   ├── Model/
 │   │   │   ├── View/
+│   │   │   ├── Service/
 │   │   │   ├── Table/
 │   │   │   └── Helper
 │   │   └── tmpl/
@@ -64,7 +65,9 @@
 ```
 
 ### Component Key Files
-- `/extension_name.xml` - Component manifest (defines version, namespace, installation)
+- `/extension_name.xml` - Component manifest (defines version, namespace, file declarations only)
+- `/config.xml` - Configuration parameters (NOT in the manifest XML)
+- `/access.xml` - ACL action definitions
 - `/services/provider.php` - Service provider for dependency injection
 - `/src/Extension/extension_nameComponent.php` - Main extension class
 - `/language` - Language files are installed within the component.

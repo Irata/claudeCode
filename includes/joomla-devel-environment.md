@@ -1,6 +1,6 @@
 ## Development Environment
 PHPStorm project configured with:
-- PHP 8.2 language level
+- PHP 8.3 language level
 - Joomla framework include paths
 - Code style enforcement
 - Source mapping between project and repository directories

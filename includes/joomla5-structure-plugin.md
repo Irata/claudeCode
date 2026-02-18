@@ -5,6 +5,7 @@
 /plugins/
 └── type/plg_type_name/
     ├── plugin_name.xml
+    ├── config.xml
     ├── language/en-GB/
     ├── services/
     │   └── provider.php
@@ -13,7 +14,8 @@
 ```
 
 ### Plugin Key Files
-- `/extension_name.xml` - Plugin manifest (defines version, namespace, installation)
+- `/extension_name.xml` - Plugin manifest (defines version, namespace, file declarations only)
+- `/config.xml` - Configuration parameters (NOT in the manifest XML)
 - `/services/provider.php` - Service provider for dependency injection
 - `/src/Extension/extension_name.php` - Main extension class
 - `/language` - Language files are installed within the plugin.

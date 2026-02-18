@@ -41,6 +41,20 @@ $this->pagination = $model->getPagination();
 $this->state = $model->getState();
 ```
 
+#### Detection Pattern
+Look for code like:
+```php
+Factory::getUser()->get('id')
+```
+
+#### Recommended Migration
+Replace with call to DI Container:
+```php
+Factory::getApplication()->getIdentity()->id;
+```
+
+
+
 #### Why This Change
 - Improves code clarity and IDE autocomplete support
 - Removes magic method overhead

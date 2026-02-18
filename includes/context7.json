@@ -280,3 +280,55 @@
       ],
       "type": "repo"
     }
+  },
+  {
+    "settings": {
+      "title": "PHPUnit",
+      "project": "/sebastianbergmann/phpunit",
+      "description": "PHPUnit Testing Framework",
+      "docsRepoUrl": "https://github.com/sebastianbergmann/phpunit",
+      "folders": [],
+      "excludeFolders": [
+        "archive",
+        "archived",
+        "old",
+        "deprecated",
+        "legacy"
+      ],
+      "excludeFiles": [
+        "CHANGELOG.md",
+        "LICENSE.md",
+        "CODE_OF_CONDUCT.md"
+      ],
+      "branch": "main",
+      "stars": 0,
+      "trustScore": 9.0,
+      "type": "repo"
+    }
+  },
+  {
+    "settings": {
+      "title": "Symfony Console",
+      "project": "/symfony/console",
+      "description": "Symfony Console Component",
+      "docsRepoUrl": "https://github.com/symfony/console",
+      "folders": [],
+      "excludeFolders": [
+        "archive",
+        "archived",
+        "old",
+        "deprecated",
+        "legacy"
+      ],
+      "excludeFiles": [
+        "CHANGELOG.md",
+        "LICENSE.md",
+        "CODE_OF_CONDUCT.md"
+      ],
+      "branch": "7.x",
+      "stars": 0,
+      "trustScore": 9.2,
+      "type": "repo"
+    }
+  }
+]

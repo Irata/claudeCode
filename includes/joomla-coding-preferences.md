@@ -16,6 +16,10 @@
 - Refer to additional context7 libraries located in @.claude/includes/context7.json before starting any tasks
 - Always use the latest version of the context7 libraries
 
+### Design Patterns
+- Do NOT use the Repository design pattern in Joomla extensions. Use Joomla's native Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) for all data access.
+- Models handle database queries, state management, and business logic — there is no need for a separate Repository layer.
+
 ### Configuration Parameters
 - Extension configuration parameters MUST be defined in a separate `config.xml` file, NOT embedded as `<config>` blocks inside the extension's manifest XML file (`extensionname.xml`).
 - The manifest XML is for extension metadata, installation instructions, namespace, and file declarations only.

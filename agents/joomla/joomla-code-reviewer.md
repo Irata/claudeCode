@@ -486,6 +486,11 @@ During code review, verify each layer follows the pattern:
 - [ ] **Controllers** contain complete CRUD operations
 - [ ] **Controllers** contain ACL checking logic
 - [ ] **Forms XML** define all fields (admin-visible and public-visible)
+- [ ] **Views** use `$this->getModel()->getItems()` — NOT deprecated `$this->get('Items')` (deprecated 5.3.0, removed 7.0)
+- [ ] **Views** use `$this->getModel()->getItem()` — NOT deprecated `$this->get('Item')`
+- [ ] **Views** use `$this->getModel()->getPagination()` — NOT deprecated `$this->get('Pagination')`
+- [ ] **Views** use `$this->getModel()->getState()` — NOT deprecated `$this->get('State')`
+- [ ] **Views** use `$this->getModel()->getForm()` — NOT deprecated `$this->get('Form')`
 - [ ] **Services** contain business logic that might be shared
 - [ ] No code references Site/API/CLI specific concerns
 
@@ -496,6 +501,7 @@ During code review, verify each layer follows the pattern:
 - [ ] **Models** call `parent::populateState()` and override parameters source only
 - [ ] **Controllers** extend Administrator controllers where applicable
 - [ ] **Controllers** call `parent::save()` and override redirect only
+- [ ] **Views** use `$this->getModel()->getItem()` — NOT deprecated `$this->get('Item')` (deprecated 5.3.0, removed 7.0)
 - [ ] **Views** use inherited model methods, don't duplicate data loading
 - [ ] **Forms** load Admin forms or extend them (not redefine fields)
 
@@ -801,5 +807,33 @@ When invoked as part of the orchestrator workflow, check for architecture and im
 - mcp__serena__write_memory("review-{ext}-findings", detailed_findings)
 - mcp__serena__write_memory("review-{ext}-action-items", required_fixes)
 ```
+
+## Common Joomla 5 Anti-Patterns to Flag
+
+### Deprecated Functions
+- **`jexit()`**: Deprecated since 4.0, removed in 6.0. Flag any usage. Use `$this->checkToken()` in controllers or throw an exception.
+- **`Session::checkToken() || jexit()`**: The entire pattern is deprecated. Replace with `$this->checkToken()`.
+- **`$this->get('...')` in views**: Deprecated in 5.3.0, removed in 7.0. Flag ALL occurrences of `$this->get('Items')`, `$this->get('Item')`, `$this->get('Pagination')`, `$this->get('State')`, `$this->get('Form')`, `$this->get('FilterForm')`, or any other `$this->get('PropertyName')` call in HtmlView classes. Replace with `$model = $this->getModel(); $model->getItems();` etc.
+
+### Filter Form Patterns
+- **`fullordering` field in filter XML**: Flag any `<field name="fullordering"` in `filter_*.xml` files. Column headings provide sorting via `HTMLHelper::_('searchtools.sort', ...)` — the fullordering dropdown is redundant. The `<fields name="list">` section should only contain the `limit` (limitbox) field.
+
+### Language String Patterns
+- **`_HEADING_` in column header constants**: Flag any `COM_{NAME}_HEADING_{FIELD}` language constants. The correct convention is `COM_{NAME}_COLUMN_{FIELD}`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are exempt — only custom/entity-specific column constants must use `_COLUMN_`.
+
+### Controller Patterns
+- **`$this->app` is correct in MVC controllers**: `BaseController` always sets `$this->app` in the constructor. `getApplication()` does NOT exist on MVC controllers — do not flag `$this->app` usage there.
+- **Missing `$this->checkToken()`**: All state-changing controller methods (save, delete, export, import, publish) MUST call `$this->checkToken()`.
+
+### Bootstrap / Frontend Patterns
+- **`new bootstrap.Modal()`**: Joomla 5 loads Bootstrap as ES modules — the global `bootstrap` object does not exist. Flag any JavaScript using `new bootstrap.Modal()`, `bootstrap.Collapse`, etc.
+  - **Fix**: Use `HTMLHelper::_('bootstrap.modal', '#modalId')` in PHP to load the module, then use `data-bs-toggle`/`data-bs-target` attributes in HTML.
+- **Toolbar buttons opening modals**: When a `standardButton` should open a modal instead of submitting the form, it MUST use `->onclick('')` to suppress the default `Joomla.submitbutton()` call. Without this, the form submits and the page reloads. Use `->listCheck(true)` if the button should be disabled until list items are selected.
+- **Inline `<script>` without Web Asset Manager**: Prefer extracting JS to separate files loaded via `$wa = $this->getDocument()->getWebAssetManager()`. Inline scripts should be minimal (e.g., wiring data-attributes on toolbar buttons).
+- **Missing `form.validate` in edit views**: Any HtmlView whose template `<form>` has `class="form-validate"` MUST load the form validator via `$this->document->getWebAssetManager()->useScript('form.validate')` in `display()`. Without this, Save/Apply toolbar buttons fail with: `document.formvalidator is undefined`.
+
+### File Upload Patterns
+- **Extension-only validation**: File uploads must validate both file extension AND MIME type (via `finfo`). Extension alone is trivially spoofable.
+- **Missing size limits**: All file uploads should enforce a reasonable size limit.
 
 **Remember**: You are providing expert-level code review with complete traceability, evidence-based recommendations, and actionable improvement guidance that elevates code quality and reduces technical debt.

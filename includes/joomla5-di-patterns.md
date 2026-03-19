@@ -178,6 +178,76 @@ $db = $this->getModel()->getDatabase();
 $db = $this->getDatabase();
 ```
 
+### Accessing Component Services via bootComponent (Internal Pattern)
+
+Joomla's `MVCComponent` does not natively expose its DI container. When code outside the component's own MVC stack needs to resolve component services (API controllers, plugins, other components, CLI commands), use the **bootComponent pattern**:
+
+#### Step 1: Expose the container from the Extension class
+
+The component's Extension class must implement `BootableExtensionInterface` and store the container passed to `boot()`:
+
+```php
+namespace Vendor\Component\Example\Administrator\Extension;
+
+use Joomla\CMS\Extension\BootableExtensionInterface;
+use Joomla\CMS\Extension\MVCComponent;
+use Psr\Container\ContainerInterface;
+
+class ExampleComponent extends MVCComponent implements BootableExtensionInterface
+{
+    private ?ContainerInterface $container = null;
+
+    /**
+     * @internal Used by controllers/plugins to resolve services.
+     *           Joomla's MVCComponent does not expose the container natively.
+     */
+    public function getContainer(): ContainerInterface
+    {
+        if ($this->container === null) {
+            throw new \RuntimeException('Component container not available. Has boot() been called?');
+        }
+
+        return $this->container;
+    }
+
+    #[\Override]
+    public function boot(ContainerInterface $container): void
+    {
+        $this->container = $container;
+        // Other boot logic...
+    }
+}
+```
+
+#### Step 2: Resolve services from anywhere
+
+```php
+use Vendor\Component\Example\Administrator\Service\SomeService;
+
+// From any code with access to the application (controllers, plugins, CLI)
+$service = $app->bootComponent('com_example')
+    ->getContainer()
+    ->get(SomeService::class);
+```
+
+#### When to use this pattern
+
+| Context | How to get services |
+|---------|-------------------|
+| **Admin controllers** (within the component) | `$this->app->bootComponent('com_example')->getContainer()->get(Service::class)` |
+| **API controllers** (within the component) | Same as admin — API controllers are in a separate namespace and don't have direct DI access |
+| **Plugins** needing component services | `$this->getApplication()->bootComponent('com_example')->getContainer()->get(Service::class)` |
+| **CLI commands** | `$this->getApplication()->bootComponent('com_example')->getContainer()->get(Service::class)` |
+| **Other components** | `Factory::getApplication()->bootComponent('com_example')->getContainer()->get(Service::class)` |
+
+#### Important notes
+
+- This is an **internal convention**, not part of Joomla's public API — the same approach is used by Akeeba Backup and other major extensions
+- `bootComponent()` triggers the component's `boot()` method if not already called, ensuring the container is populated
+- Services resolved this way are the same singleton instances registered in `services/provider.php`
+- The `@internal` docblock on `getContainer()` signals that this is a bridge method, not a public extension point
+- **Never call `getContainer()` from within the component's own models or views** — those should use constructor injection via the service provider
+
 ### Anti-Patterns to Avoid
 
 ```php

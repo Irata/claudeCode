@@ -48,10 +48,21 @@ You are a **Joomla 5 Build & Packaging Agent**. You manage Phing build files, cr
 2. Identify extension type and packaging requirements
 ```
 
-## Build Directory Structure
+,## Repository Directory Structure
 
 ```
 E:\repositories\{name}\
+├── Components\
+│   └── com_{name}\
+│       ├── admin\             — Administrator backend code
+│       ├── api\               — REST API code
+│       ├── media\             — CSS, JS, joomla.asset.json
+│       └── site\              — Public frontend code
+├── Plugins\
+│   ├── console\               — CLI console plugins
+│   ├── webservices\           — API routing plugins
+│   └── system\                — System plugins
+├── Files\                     — Non-extension files
 ├── Phing\
 │   ├── build.xml              — Main Phing build file
 │   ├── build.properties       — Build configuration properties
@@ -79,11 +90,12 @@ ext.php.min=8.3
 # Directories
 dir.source=${project.basedir}/..
 dir.packages=${project.basedir}/../packages
-dir.admin=${dir.source}/administrator/components/com_${ext.name}
-dir.site=${dir.source}/components/com_${ext.name}
-dir.api=${dir.source}/api/components/com_${ext.name}
-dir.media=${dir.source}/media/com_${ext.name}
-dir.language=${dir.source}/language
+dir.component=${dir.source}/Components/com_${ext.name}
+dir.admin=${dir.component}/admin
+dir.site=${dir.component}/site
+dir.api=${dir.component}/api
+dir.media=${dir.component}/media
+dir.plugins=${dir.source}/Plugins
 ```
 
 ### build.xml (Component)
@@ -191,18 +203,24 @@ dir.language=${dir.source}/language
 
 ## Version Management
 
-### SemVer Convention
-- `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
-- MAJOR: Breaking changes, major feature additions
-- MINOR: New features, backwards compatible
-- PATCH: Bug fixes, backwards compatible
+### SemVer Convention (V.R.M)
+- `V.R.M` — Version.Release.Modification (e.g., `1.2.3`)
+- **V** (Version): Breaking changes, major feature additions
+- **R** (Release): New features, backwards compatible
+- **M** (Modification): Bug fixes, backwards compatible
+- **Reset rules when incrementing**:
+  - Incrementing **V** resets both **R** and **M** to `0` (e.g. `1.2.3` → `2.0.0`)
+  - Incrementing **R** resets **M** to `0` (e.g. `1.2.3` → `1.3.0`)
+  - Incrementing **M** changes only **M** (e.g. `1.2.3` → `1.2.4`)
 
 ### Files to Update on Version Bump
-1. Extension manifest XML (`<version>`)
-2. `build.properties` (`ext.version`)
+1. Extension manifest XML (`<version>`) — e.g. `admin/com_{name}/{name}.xml`
+2. Phing build file (`version` property) — e.g. `Phing/com_{name}.xml`
 3. SQL update script filename (`sql/updates/mysql/{version}.sql`)
 4. Package manifest if applicable (`pkg_{name}.xml`)
 5. Changelog
+
+**CRITICAL:** The manifest XML version, Phing build file version, and latest SQL update filename MUST always use the same V.R.M value. Version bumps to the manifest and Phing only occur when a **new** SQL update file is created — not when appending to an existing one.
 
 ## Package Validation Checklist
 
@@ -217,6 +235,16 @@ Before distribution, verify:
 - [ ] `access.xml` and `config.xml` are included (components)
 - [ ] Script file (`script.php`) handles install/update/uninstall if needed
 - [ ] No development files included (.git, tests/, node_modules/, etc.)
+
+## Git Commit Message Convention
+
+Commit messages for extension changes MUST include the extension name and its current V.R.M version from the manifest XML:
+- Format: `{extension_name} {V.R.M} - meaningful description`
+- Examples:
+  - `com_forum 0.0.8 - Fix nested set rebuild and add utilities toolbar`
+  - `plg_webservices_forum 1.0.0 - Add board API endpoint`
+- The version number is read from the `<version>` element in the extension's manifest XML
+- For commits touching multiple extensions, create separate commits per extension
 
 ## Key Rules
 

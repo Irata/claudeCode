@@ -342,15 +342,72 @@ public function save($key = null, $urlVar = null): void
 
 ### 3. Views
 - Extend `HtmlView`
-- Use direct model calls (NOT deprecated `$this->get()`):
-  ```php
-  $model = $this->getModel();
-  $this->item = $model->getItem();
-  $this->params = $this->getApplication()->getParams();
-  ```
+- **CRITICAL**: `$this->get('Items')`, `$this->get('Item')`, `$this->get('Pagination')`, `$this->get('State')` are **deprecated in 5.3.0 and removed in 7.0** — NEVER use them. Use `$this->getModel()->getItems()` etc. See reference templates below.
 - Set document title and metadata from item/menu parameters
 - Add canonical URLs
 - Add schema.org structured data where appropriate
+
+#### Site Item View Reference Template
+Use this as the base for ALL site single-item views:
+```php
+<?php
+
+defined('_JEXEC') or die;
+
+namespace {Vendor}\Component\{Name}\Site\View\{Entity};
+
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+
+class HtmlView extends BaseHtmlView
+{
+    protected $item;
+    protected $params;
+    protected $state;
+
+    public function display($tpl = null): void
+    {
+        // CORRECT: Direct model calls — NEVER use $this->get('Item')
+        $model        = $this->getModel();
+        $this->item   = $model->getItem();
+        $this->state  = $model->getState();
+        $this->params = $this->getApplication()->getParams();
+
+        parent::display($tpl);
+    }
+}
+```
+
+#### Site List View Reference Template
+Use this as the base for ALL site list/category views:
+```php
+<?php
+
+defined('_JEXEC') or die;
+
+namespace {Vendor}\Component\{Name}\Site\View\{Entities};
+
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+
+class HtmlView extends BaseHtmlView
+{
+    protected $items;
+    protected $pagination;
+    protected $params;
+    protected $state;
+
+    public function display($tpl = null): void
+    {
+        // CORRECT: Direct model calls — NEVER use $this->get('Items')
+        $model              = $this->getModel();
+        $this->items        = $model->getItems();
+        $this->pagination   = $model->getPagination();
+        $this->state        = $model->getState();
+        $this->params       = $this->getApplication()->getParams();
+
+        parent::display($tpl);
+    }
+}
+```
 
 ### 4. Templates (`tmpl/`)
 - Semantic HTML5 with ARIA attributes for accessibility
@@ -358,6 +415,8 @@ public function save($key = null, $urlVar = null): void
 - Use `LayoutHelper::render()` for reusable layout fragments
 - Include pagination: `$this->pagination->getListFooter()`
 - CSRF tokens for forms: `HTMLHelper::_('form.token')`
+- **Forms with `class="form-validate"`**: The view MUST load `$this->document->getWebAssetManager()->useScript('form.validate')` — otherwise Save buttons fail with JS error `document.formvalidator is undefined`
+- **List column header language strings**: Use `COM_{NAME}_COLUMN_{FIELD}` for custom columns. NEVER use `_HEADING_`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are used directly.
 - Responsive design considerations
 
 ### 5. SEF Router (`src/Service/Router.php`)

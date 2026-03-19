@@ -370,14 +370,15 @@ namespace Emporium\AccountData\Entity;
 
 class Invoice {
     public int $id;
+    public int $asset_id;
     public string $number;  // Invoice number (auto-generated or custom)
+    public string $alias;
     public string $type;  // 'sales_invoice', 'purchase_invoice', 'credit_note'
     public int $customerId;  // Reference to EntityData customer
     public string $customerName;  // Snapshot
     public string $customerAddress;  // Snapshot
     public \DateTime $invoiceDate;
     public \DateTime $dueDate;
-    public string $status;  // 'draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled'
     public float $subtotal;
     public float $taxAmount;
     public float $shippingCost;
@@ -387,10 +388,20 @@ class Invoice {
     public float $balance;  // remaining
     public string $currency;
     public string $paymentTerms;  // Net 30, Due on receipt, etc.
-    public string $notes;
     public array $lineItems;  // LineItem[]
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Standard Joomla system fields
+    public int $state;              // 1=published, 0=unpublished, 2=archived, -2=trashed
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 }
 ```
 
@@ -400,7 +411,9 @@ namespace Emporium\AccountData\Entity;
 
 class Order {
     public int $id;
+    public int $asset_id;
     public string $number;  // Order number
+    public string $alias;
     public string $type;  // 'sales_order', 'purchase_order'
     public int $customerId;  // Reference to EntityData customer
     public string $customerName;  // Snapshot
@@ -409,7 +422,6 @@ class Order {
     public string $orderDate;
     public string $requiredDate;
     public string $shippingDate;
-    public string $status;  // 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled'
     public float $subtotal;
     public float $taxAmount;
     public float $shippingCost;
@@ -421,9 +433,19 @@ class Order {
     public string $poReference;  // PO number if provided
     public array $lineItems;  // LineItem[]
     public ?int $relatedInvoiceId;  // If invoice created from order
-    public string $notes;
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Standard Joomla system fields
+    public int $state;              // 1=published, 0=unpublished, 2=archived, -2=trashed
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 }
 ```
 
@@ -431,6 +453,7 @@ class Order {
 ```php
 namespace Emporium\AccountData\Entity;
 
+// System/log table — minimal system fields
 class Payment {
     public int $id;
     public string $reference;  // Payment reference/receipt number
@@ -445,7 +468,10 @@ class Payment {
     public string $transactionId;  // External transaction ID
     public string $notes;
     public ?\DateTime $refundDate;
-    public \DateTime $createdDate;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
 }
 ```
 
@@ -453,6 +479,7 @@ class Payment {
 ```php
 namespace Emporium\AccountData\Entity;
 
+// Secondary entity — admin-managed, minimum Joomla system fields
 class Pricing {
     public int $id;
     public int $itemId;  // Reference to InventoryData item
@@ -465,8 +492,11 @@ class Pricing {
     public float $discountPercent;  // For tiered pricing
     public \DateTime $effectiveDate;
     public ?\DateTime $expiryDate;
-    public bool $active;
-    public string $notes;
+    public int $state;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
 }
 ```
 
@@ -493,6 +523,7 @@ class LineItem {
 ```php
 namespace Emporium\AccountData\Entity;
 
+// System/log table — minimal system fields (auto-generated GL entries)
 class Transaction {
     public int $id;
     public string $accountCode;  // GL account code
@@ -502,8 +533,8 @@ class Transaction {
     public \DateTime $transactionDate;
     public string $reference;  // Invoice, order, or payment reference
     public int $referenceId;  // Invoice ID, order ID, payment ID
-    public int $createdBy;
-    public \DateTime $createdDate;
+    public int $created_by;
+    public \DateTime $created;
 }
 ```
 
@@ -662,89 +693,138 @@ class InvoicingService {
 ## Database Tables
 
 ```sql
--- Invoices
-CREATE TABLE `#__accountdata_invoices` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    number VARCHAR(50) UNIQUE NOT NULL,
-    type ENUM('sales_invoice', 'purchase_invoice', 'credit_note'),
-    customer_id INT NOT NULL,
-    customer_name VARCHAR(255),
-    customer_address TEXT,
-    invoice_date DATE,
-    due_date DATE,
-    status ENUM('draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled') DEFAULT 'draft',
-    subtotal DECIMAL(12,2),
-    tax_amount DECIMAL(12,2),
-    shipping_cost DECIMAL(12,2),
-    discount_amount DECIMAL(12,2),
-    total DECIMAL(12,2),
-    paid_amount DECIMAL(12,2) DEFAULT 0,
-    currency VARCHAR(3),
-    payment_terms VARCHAR(50),
-    notes TEXT,
-    created_date DATETIME,
-    modified_date DATETIME
-);
+-- Invoices (CORE/CRUD table — full Joomla system fields)
+CREATE TABLE IF NOT EXISTS `#__accountdata_invoices` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `number` VARCHAR(50) NOT NULL,
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    `type` ENUM('sales_invoice', 'purchase_invoice', 'credit_note') NOT NULL,
+    `customer_id` INT NOT NULL,
+    `customer_name` VARCHAR(255),                   -- Snapshot at invoice time
+    `customer_address` TEXT,                         -- Snapshot at invoice time
+    `invoice_date` DATE,
+    `due_date` DATE,
+    `subtotal` DECIMAL(12,2),
+    `tax_amount` DECIMAL(12,2),
+    `shipping_cost` DECIMAL(12,2),
+    `discount_amount` DECIMAL(12,2),
+    `total` DECIMAL(12,2),
+    `paid_amount` DECIMAL(12,2) NOT NULL DEFAULT 0,
+    `currency` VARCHAR(3),
+    `payment_terms` VARCHAR(50),
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_number` (`number`),
+    KEY `idx_customer_id` (`customer_id`),
+    KEY `idx_state` (`state`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Orders
-CREATE TABLE `#__accountdata_orders` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    number VARCHAR(50) UNIQUE NOT NULL,
-    type ENUM('sales_order', 'purchase_order'),
-    customer_id INT NOT NULL,
-    billing_address_id INT,
-    shipping_address_id INT,
-    order_date DATE,
-    required_date DATE,
-    shipping_date DATE,
-    status ENUM('pending', 'confirmed', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
-    subtotal DECIMAL(12,2),
-    tax_amount DECIMAL(12,2),
-    shipping_cost DECIMAL(12,2),
-    discount_amount DECIMAL(12,2),
-    total DECIMAL(12,2),
-    currency VARCHAR(3),
-    shipping_method VARCHAR(50),
-    payment_method VARCHAR(50),
-    po_reference VARCHAR(50),
-    related_invoice_id INT,
-    notes TEXT,
-    created_date DATETIME,
-    modified_date DATETIME
-);
+-- Orders (CORE/CRUD table — full Joomla system fields)
+CREATE TABLE IF NOT EXISTS `#__accountdata_orders` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `number` VARCHAR(50) NOT NULL,
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    `type` ENUM('sales_order', 'purchase_order') NOT NULL,
+    `customer_id` INT NOT NULL,
+    `billing_address_id` INT,
+    `shipping_address_id` INT,
+    `order_date` DATE,
+    `required_date` DATE,
+    `shipping_date` DATE,
+    `subtotal` DECIMAL(12,2),
+    `tax_amount` DECIMAL(12,2),
+    `shipping_cost` DECIMAL(12,2),
+    `discount_amount` DECIMAL(12,2),
+    `total` DECIMAL(12,2),
+    `currency` VARCHAR(3),
+    `shipping_method` VARCHAR(50),
+    `payment_method` VARCHAR(50),
+    `po_reference` VARCHAR(50),
+    `related_invoice_id` INT,
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_number` (`number`),
+    KEY `idx_customer_id` (`customer_id`),
+    KEY `idx_state` (`state`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Payments
-CREATE TABLE `#__accountdata_payments` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    reference VARCHAR(100) UNIQUE NOT NULL,
-    invoice_id INT NOT NULL,
-    customer_id INT NOT NULL,
-    amount DECIMAL(12,2),
-    method VARCHAR(50),
-    status ENUM('pending', 'reconciled', 'failed', 'refunded') DEFAULT 'pending',
-    payment_date DATE,
-    reconciliation_date DATE,
-    bank_account VARCHAR(50),
-    transaction_id VARCHAR(100),
-    notes TEXT,
-    created_date DATETIME
-);
+-- Payments (System/log table — minimal system fields, not user-managed CRUD)
+CREATE TABLE IF NOT EXISTS `#__accountdata_payments` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `reference` VARCHAR(100) NOT NULL,
+    `invoice_id` INT NOT NULL,
+    `customer_id` INT NOT NULL,
+    `amount` DECIMAL(12,2),
+    `method` VARCHAR(50),
+    `status` ENUM('pending', 'reconciled', 'failed', 'refunded') NOT NULL DEFAULT 'pending',
+    `payment_date` DATE,
+    `reconciliation_date` DATE,
+    `bank_account` VARCHAR(50),
+    `transaction_id` VARCHAR(100),
+    `notes` TEXT,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_reference` (`reference`),
+    KEY `idx_invoice_id` (`invoice_id`),
+    KEY `idx_customer_id` (`customer_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Pricing
-CREATE TABLE `#__accountdata_pricing` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    item_id INT NOT NULL,
-    code VARCHAR(50),
-    base_price DECIMAL(12,2),
-    currency VARCHAR(3),
-    customer_id INT,
-    min_quantity INT,
-    max_quantity INT,
-    discount_percent DECIMAL(5,2),
-    effective_date DATE,
-    expiry_date DATE,
-    active TINYINT(1) DEFAULT 1
-);
+-- Pricing (Secondary entity table — admin-managed, minimum system fields)
+CREATE TABLE IF NOT EXISTS `#__accountdata_pricing` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `item_id` INT NOT NULL,
+    `code` VARCHAR(50),
+    `base_price` DECIMAL(12,2),
+    `currency` VARCHAR(3),
+    `customer_id` INT,
+    `min_quantity` INT,
+    `max_quantity` INT,
+    `discount_percent` DECIMAL(5,2),
+    `effective_date` DATE,
+    `expiry_date` DATE,
+    `state` TINYINT(1) NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_item_id` (`item_id`),
+    KEY `idx_state` (`state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---

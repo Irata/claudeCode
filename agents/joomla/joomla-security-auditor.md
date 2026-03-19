@@ -81,13 +81,14 @@ Remediation: htmlspecialchars($var, ENT_QUOTES, 'UTF-8'), $this->escape(), Text:
 ### Phase 3: CSRF Analysis
 ```
 Detection patterns:
-- Missing Session::checkToken() in POST handlers
+- Missing $this->checkToken() in controller methods
 - Missing HTMLHelper::_('form.token') in forms
 - State-changing GET requests without token validation
 - AJAX endpoints without token verification
-- Missing $this->checkToken() in controller methods
+- Using deprecated `Session::checkToken() || jexit()` — must use `$this->checkToken()` instead
 
-Remediation: Add CSRF token to all forms and validate in all state-changing controllers
+Remediation: Use $this->checkToken() in all state-changing controllers, HTMLHelper::_('form.token') in all forms.
+Note: Session::checkToken() || jexit() is deprecated (jexit removed in 6.0). $this->checkToken() is the correct Joomla 5 approach.
 ```
 
 ### Phase 4: Access Control Analysis
@@ -105,13 +106,15 @@ Cross-reference against: architecture-{ext}-acl-matrix
 ### Phase 5: File Upload Analysis
 ```
 Detection patterns:
-- File uploads without MIME type validation
+- File uploads without MIME type validation (finfo FILEINFO_MIME_TYPE)
 - Missing file extension whitelisting
+- Extension-only validation without MIME check (extension is trivially spoofable)
 - Path traversal in upload destinations: \.\./
 - No file size limits
 - Executable uploads to web-accessible directories
+- Using user-supplied filename without sanitization (Content-Disposition header injection)
 
-Remediation: Use Joomla's InputFilter, validate MIME types, whitelist extensions
+Remediation: Validate BOTH file extension AND MIME type (via finfo), whitelist extensions, enforce size limits, sanitize filenames with preg_replace('/[^a-zA-Z0-9._-]/', '_', $filename), use only tmp_name for reading file contents
 ```
 
 ### Phase 6: Input Validation Analysis

@@ -391,6 +391,8 @@ try {
 
 ### 1. API Controllers (`api/src/Controller/`)
 
+API controllers resolve component services via `bootComponent()->getContainer()->get()`. This pattern is necessary because API controllers are in a separate namespace and cannot use constructor injection for component services.
+
 ```php
 <?php
 
@@ -399,22 +401,43 @@ namespace Vendor\Component\Example\Api\Controller;
 defined('_JEXEC') or die;
 
 use Joomla\CMS\MVC\Controller\ApiController;
+use Vendor\Component\Example\Administrator\Service\SomeService;
 
 class ItemController extends ApiController
 {
     protected $contentType = 'items';
     protected $default_view = 'items';
 
-    // Override for custom field mapping
+    public function customAction(): void
+    {
+        // Resolve service from the component's DI container
+        /** @var SomeService $service */
+        $service = $this->app->bootComponent('com_example')
+            ->getContainer()
+            ->get(SomeService::class);
+
+        $result = $service->doSomething();
+        // Format and return response...
+    }
+
     protected function save($recordKey = null): void
     {
-        // Custom save logic with validation
         parent::save($recordKey);
     }
 }
 ```
 
+**Important:** The Extension class must implement `getContainer()` to expose the DI container. See `includes/joomla5-di-patterns.md` for the full pattern.
+```
+
 ### 2. API Views (`api/src/View/`)
+
+> **IMPORTANT:** The base class `Joomla\CMS\MVC\View\JsonApiView` declares
+> `$fieldsToRenderItem` and `$fieldsToRenderList` **without** a type.
+> Child classes **MUST NOT** add the `array` type declaration — PHP will
+> throw a fatal error because you cannot narrow or add a type to an
+> untyped parent property. Always use `protected $fieldsToRender…`, never
+> `protected array $fieldsToRender…`.
 
 ```php
 <?php

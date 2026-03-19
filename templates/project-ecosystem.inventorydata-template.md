@@ -290,8 +290,10 @@ namespace Emporium\InventoryData\Entity;
 
 class Item {
     public int $id;
+    public int $asset_id;
     public string $sku;
     public string $name;
+    public string $alias;
     public string $description;
     public int $categoryId;
     public int $supplierId;  // From com_entitydata
@@ -300,11 +302,19 @@ class Item {
     public bool $trackStock;
     public int $currentStock;
     public int $reorderLevel;
-    public bool $published;
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
-    public int $createdBy;
-    public int $modifiedBy;
+
+    // Standard Joomla system fields
+    public int $state;              // 1=published, 0=unpublished, 2=archived, -2=trashed
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 
     // Lazy-loaded relations
     public ?Category $category;
@@ -320,14 +330,27 @@ namespace Emporium\InventoryData\Entity;
 
 class Category {
     public int $id;
+    public int $asset_id;
     public string $name;
     public string $alias;
     public string $description;
     public ?int $parentId;
     public int $level;
     public string $path;  // /parent/child/name
+
+    // Standard Joomla system fields
+    public int $state;
     public int $ordering;
-    public bool $published;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
+
     public array $metadata = [];
 }
 ```
@@ -521,41 +544,62 @@ class InventoryListener {
 ## Database Tables
 
 ```sql
--- Items
-CREATE TABLE `#__inventorydata_items` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    sku VARCHAR(50) UNIQUE NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    category_id INT,
-    supplier_id INT,  -- Link to EntityData supplier
-    weight DECIMAL(8,2),
-    dimensions JSON,
-    track_stock TINYINT(1),
-    current_stock INT DEFAULT 0,
-    reorder_level INT DEFAULT 0,
-    published TINYINT(1) DEFAULT 1,
-    created_date DATETIME,
-    modified_date DATETIME,
-    created_by INT,
-    modified_by INT
-);
+-- Items (CORE/CRUD table — full Joomla system fields)
+CREATE TABLE IF NOT EXISTS `#__inventorydata_items` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `sku` VARCHAR(50) NOT NULL,
+    `name` VARCHAR(255) NOT NULL DEFAULT '',
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    `description` TEXT,
+    `category_id` INT,
+    `supplier_id` INT,                              -- Link to EntityData supplier
+    `weight` DECIMAL(8,2),
+    `dimensions` JSON,
+    `track_stock` TINYINT(1) NOT NULL DEFAULT 0,
+    `current_stock` INT NOT NULL DEFAULT 0,
+    `reorder_level` INT NOT NULL DEFAULT 0,
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_sku` (`sku`),
+    KEY `idx_state` (`state`),
+    KEY `idx_category_id` (`category_id`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_language` (`language`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Stock Reservations
-CREATE TABLE `#__inventorydata_reservations` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    item_id INT NOT NULL,
-    quantity INT NOT NULL,
-    status ENUM('pending', 'confirmed', 'released'),
-    reference VARCHAR(100),  -- e.g., "order-123"
-    reserved_date DATETIME,
-    expiry_date DATETIME,
-    confirmed_by INT,
-    confirmed_date DATETIME,
-    released_by INT,
-    released_date DATETIME,
-    reason VARCHAR(255)
-);
+-- Stock Reservations (System/log table — minimal system fields, not user-managed CRUD)
+CREATE TABLE IF NOT EXISTS `#__inventorydata_reservations` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `item_id` INT NOT NULL,
+    `quantity` INT NOT NULL,
+    `status` ENUM('pending', 'confirmed', 'released') NOT NULL DEFAULT 'pending',
+    `reference` VARCHAR(100),                       -- e.g., "order-123"
+    `reserved_date` DATETIME,
+    `expiry_date` DATETIME,
+    `confirmed_by` INT UNSIGNED,
+    `confirmed_date` DATETIME,
+    `released_by` INT UNSIGNED,
+    `released_date` DATETIME,
+    `reason` VARCHAR(255),
+    `created` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_item_id` (`item_id`),
+    KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---

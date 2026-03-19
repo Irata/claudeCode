@@ -19,5 +19,26 @@ PHPStorm project configured with:
 - **WSL Symbolic Links** are used to link the source files to the directory containing the Joomla installation.
 - **Website URLs** `https\\:_domain_.local` are used to link the source files to the directory containing the Joomla installation.
 
+### Repository Folder Structure
+
+The standard folder structure for Joomla projects in their `E:\repositories\{REPO_NAME}` directory:
+
+```
+E:\repositories\{REPO_NAME}\
+├── admin/com_example/          — Administrator backend code
+├── api/com_example/            — REST API code (same level as admin/site)
+├── media/com_example/          — CSS, JS, joomla.asset.json
+├── site/com_example/           — Public frontend code
+├── plugins/
+│   ├── console/            — CLI console plugins
+│   ├── webservices/        — API routing plugins
+│   └── system/             — System plugins
+├── Files/                  — Non-extension files (scripts, configs, etc.)
+└── Phing/                  — Build configuration (build.xml, build.properties)
+```
+
+Key conventions:
+- `/tmpl` is at the same level as `/src` within each component layer — NOT a subdirectory of `/View`.
+
 **Development Setup** (Windows):
 Run `symlink.bat` to create junction link for live development in Joomla installation.

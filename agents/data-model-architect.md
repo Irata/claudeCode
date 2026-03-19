@@ -26,9 +26,16 @@ When designing storage schemas:
 - Apply appropriate normalization (typically 3NF for OLTP, denormalized for OLAP)
 - Choose optimal data types considering storage efficiency and query performance
 - Define primary keys, foreign keys, and indexes strategically
-- Include audit fields (created_at, updated_at, created_by, etc.) where appropriate
 - Consider partitioning strategies for large datasets
 - Document all design decisions and trade-offs
+
+When designing schemas for Joomla extensions, include standard Joomla system fields on core/CRUD tables (tables where users create, edit, delete records):
+- **Publication & workflow**: `state` (TINYINT, 1=published/0=unpublished/2=archived/-2=trashed), `ordering` (INT), `access` (INT UNSIGNED, Joomla access level)
+- **Ownership & audit**: `created` (DATETIME), `created_by` (INT UNSIGNED), `modified` (DATETIME), `modified_by` (INT UNSIGNED)
+- **Edit locking**: `checked_out` (INT UNSIGNED), `checked_out_time` (DATETIME)
+- **Optional content fields**: `asset_id` (INT UNSIGNED, for per-item ACL), `alias` (VARCHAR, URL slug), `publish_up`/`publish_down` (DATETIME), `language` (CHAR(7)), `note` (VARCHAR)
+
+These system fields are NOT required on link/join tables (cross-references like `item_tag_map`), log tables (auto-generated records), or reservation/transaction tables that track system state rather than user-managed content. Use Joomla naming conventions: `created` not `created_at`, `modified` not `updated_at`, `state` not `status` for publication state.
 
 When creating reporting models:
 - Design for query performance and analytical use cases

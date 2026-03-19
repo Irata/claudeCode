@@ -1,17 +1,16 @@
-# Emporium Multi-Extension Data Ecosystem
+# Multi-Extension Data Ecosystem Template
 
 ## Overview
 
-The Emporium ecosystem is a modular architecture where multiple independent extensions share a common data access layer. This document provides a complete overview of the ecosystem, data flows, dependencies, and design patterns.
+This is a **generic template** for projects where multiple independent Joomla extensions share a common data access layer. Copy and customize for your specific project, replacing placeholder names with your actual extension names.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                     DOMAIN/APPLICATION EXTENSIONS                    │
 │  (These extensions use data layer services to build applications)    │
 │                                                                      │
-│  com_emporium (E-commerce)  future_shop (Single Vendor)             │
-│  extension_events (Events)  extension_invoicing (Invoicing)         │
-│  extension_mailing (Email)  extension_accounting (GL Management)    │
+│  com_yourapp (Primary App)    com_secondapp (Secondary App)         │
+│  ext_notifications (Alerts)   ext_reporting (Reports)               │
 └──────────────────┬───────────────────────────────────────────────────┘
                    │
                    │ (Inject services, listen to events)
@@ -19,19 +18,17 @@ The Emporium ecosystem is a modular architecture where multiple independent exte
 ┌──────────────────────────────────────────────────────────────────────┐
 │              DATA ACCESS LAYER EXTENSIONS (Single Source of Truth)   │
 │                                                                      │
-│  com_inventorydata          com_entitydata          com_accountdata │
-│  ─────────────────          ──────────────          ────────────────│
-│  • Items                    • Customers             • Invoices      │
-│  • Categories               • Suppliers             • Orders        │
-│  • Stock Levels             • Businesses            • Payments      │
-│  • Reservations             • Contacts              • Transactions  │
-│  • Lists                    • Addresses             • Pricing       │
-│                             • Relationships         • Tax Rates     │
+│  com_productdata              com_customerdata        com_orderdata │
+│  ─────────────────            ────────────────        ─────────────│
+│  • Products                   • Customers             • Orders      │
+│  • Categories                 • Suppliers             • Invoices    │
+│  • Stock Levels               • Contacts              • Payments    │
+│  • Reservations               • Addresses             • Pricing     │
 │                                                                      │
-│  Provides: Repositories & Business Logic Services                   │
-│  Events: Item/Stock/Category updates                                │
+│  Provides: Models & Business Logic Services (Model→Table pattern)   │
+│  Events: Product/Stock/Category updates                             │
 │          Customer/Supplier updates                                  │
-│          Invoice/Order/Payment updates                              │
+│          Order/Invoice/Payment updates                              │
 └──────────────────────────────────────────────────────────────────────┘
                    ↓
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -45,10 +42,7 @@ The Emporium ecosystem is a modular architecture where multiple independent exte
 ## Architecture Principles
 
 ### 1. **Data Layer Separation**
-Each data layer extension manages a specific business domain:
-- **com_inventorydata** — Product/inventory data (vertical slice)
-- **com_entitydata** — Customer/supplier/business data (vertical slice)
-- **com_accountdata** — Financial/accounting data (vertical slice)
+Each data layer extension manages a specific business domain as a vertical slice. Each has its own Models, Tables, and Services.
 
 ### 2. **No Circular Dependencies**
 - Data layers do NOT depend on each other
@@ -57,9 +51,7 @@ Each data layer extension manages a specific business domain:
 - Domain extensions MAY depend on each other
 
 ### 3. **Single Source of Truth**
-- Customer data exists only in com_entitydata
-- Item/inventory data exists only in com_inventorydata
-- Invoice/order data exists only in com_accountdata
+- Each data entity exists in only one data layer
 - No data duplication across extensions
 
 ### 4. **Event-Driven Communication**
@@ -67,305 +59,142 @@ Each data layer extension manages a specific business domain:
 - Domain extensions listen to events and react
 - Enables loose coupling between extensions
 
-### 5. **Service-Based Access**
-- All data access through repositories/services, not direct queries
-- Repositories provide consistent interfaces
-- Business logic encapsulated in services
+### 5. **Joomla First — Model→Table Access**
+- All data access through Models and Tables, not direct queries
+- **Models** (BaseDatabaseModel subclasses) provide data retrieval and delegate writes to Tables
+- **Tables** (Table subclasses) handle all database writes: `save()`, `delete()`, `publish()`
+- **No Repository layer** — Services use Models which use Tables
+- Business logic encapsulated in Services
 
 ---
 
-## Data Domains
+## Data Layer Structure (Generic)
 
-### Domain 1: Inventory Data (com_inventorydata)
+### Data Layer Extension Pattern
 
-**Manages**:
-- What products/items exist
-- How much stock we have
-- How stock is reserved/allocated
-- Product categories and organization
-- Supplier information (linked to EntityData)
+Each data layer extension follows this structure:
 
-**Public Repositories**:
 ```
-ItemRepository          - Get/save/search items
-CategoryRepository      - Get/save categories
-ListRepository          - Manage predefined item lists
+Vendor\Component\DataLayerName\Administrator\
+├── Service\
+│   ├── StockReservationService.php    — Business logic service
+│   └── AvailabilityService.php        — Business logic service
+├── Model\
+│   ├── ProductModel.php               — MVC FormModel for admin CRUD
+│   ├── ProductsModel.php              — MVC ListModel for admin list
+│   ├── StockModel.php                 — Service Model (BaseDatabaseModel)
+│   └── ReservationModel.php           — Service Model (BaseDatabaseModel)
+└── Table\
+    ├── ProductTable.php               — Shared by ProductModel and StockModel
+    └── ReservationTable.php           — Used by ReservationModel
 ```
 
-**Public Services**:
+**Public Services** (injected by domain extensions):
 ```
-StockReservationService - Reserve and release stock
-AvailabilityService     - Check if items are available
-StockService            - Adjust stock levels, transfers
+StockReservationService  — Reserve and release stock (uses ReservationModel → ReservationTable)
+AvailabilityService      — Check item availability (uses StockModel for reads)
 ```
 
 **Events Emitted**:
 ```
-onInventoryItemCreated       - New item added
-onInventoryItemUpdated       - Item changed
-onInventoryStockReserved     - Stock reserved for order
-onInventoryStockConfirmed    - Reservation committed
-onInventoryStockReleased     - Reservation cancelled
-onInventoryLowStock          - Item below threshold
-onInventoryOutOfStock        - Item unavailable
+onProductCreated         — New product added
+onProductUpdated         — Product changed
+onStockReserved          — Stock reserved for order
+onStockReleased          — Reservation cancelled
+onLowStock               — Item below threshold
 ```
-
-**Used By**:
-- com_emporium (primary consumer)
-- extension_invoicing (line items, valuation)
-- extension_mailing (stock alerts)
-- com_accountdata (cost references)
 
 ---
 
-### Domain 2: Entity Data (com_entitydata)
-
-**Manages**:
-- Who our customers are
-- Who our suppliers are
-- What businesses exist
-- Contact information and addresses
-- Relationships between entities
-
-**Public Repositories**:
-```
-CustomerRepository      - Get/save customers
-SupplierRepository      - Get/save suppliers
-BusinessRepository      - Get/save businesses
-ContactRepository       - Get/save contacts
-AddressRepository       - Get/save addresses
-```
-
-**Public Services**:
-```
-EntityRelationshipService      - Define relationships
-CustomerClassificationService - Classify customers (VIP, wholesale)
-EntityValidationService        - Validate entity data
-```
-
-**Events Emitted**:
-```
-onEntityCustomerCreated        - New customer added
-onEntityCustomerUpdated        - Customer profile changed
-onEntityCustomerClassified     - Customer tier changed
-onEntitySupplierCreated        - New supplier added
-onEntitySupplierUpdated        - Supplier changed
-onEntitySupplierStatusChanged  - Supplier status (active/suspended)
-onEntityBusinessCreated        - New business added
-onEntityContactCreated         - New contact added
-onEntityAddressCreated         - New address added
-```
-
-**Used By**:
-- com_emporium (primary consumer)
-- extension_invoicing (customer/supplier data)
-- extension_mailing (email addresses, contact info)
-- com_inventorydata (supplier details)
-
----
-
-### Domain 3: Account Data (com_accountdata)
-
-**Manages**:
-- Sales and purchase invoices
-- Customer and purchase orders
-- Payment records
-- Financial transactions
-- Product pricing
-- Tax configuration
-
-**Public Repositories**:
-```
-InvoiceRepository       - Get/save invoices
-OrderRepository         - Get/save orders
-PaymentRepository       - Get/save payments
-PricingRepository       - Get/save pricing
-TransactionRepository   - Get/save GL transactions
-```
-
-**Public Services**:
-```
-InvoiceCalculationService   - Calculate invoice totals
-OrderProcessingService      - Process order workflows
-PaymentProcessingService    - Process payments/refunds
-TaxCalculationService       - Calculate taxes
-```
-
-**Events Emitted**:
-```
-onAccountDataInvoiceCreated       - Invoice generated
-onAccountDataInvoiceStatusChanged - Invoice status changed
-onAccountDataInvoicePaid          - Invoice paid
-onAccountDataOrderCreated         - Order created
-onAccountDataOrderConfirmed       - Order confirmed
-onAccountDataOrderCompleted       - Order delivered/completed
-onAccountDataPaymentReceived      - Payment received
-onAccountDataPriceUpdated         - Item price changed
-```
-
-**Used By**:
-- com_emporium (primary consumer)
-- extension_invoicing (required consumer)
-- extension_reporting (financial reports)
-- extension_mailing (invoices, payment receipts)
-
----
-
-## Data Flows
+## Data Flows (Generic Examples)
 
 ### Flow 1: Customer Places Order (Multi-Extension)
 
 ```
-1. com_emporium (Site)
+1. com_yourapp (Site)
    └─ User adds item to cart
-   └─ Calls: InventoryData\StockReservationService::reserve()
-            EntityData\CustomerRepository::getCustomer()
+   └─ Calls: ProductData\StockReservationService::reserve()
+            CustomerData\CustomerModel::getItem()
 
-2. InventoryData
-   └─ Reserves stock
-   └─ Emits: onInventoryStockReserved
+2. ProductData
+   └─ Reserves stock via ReservationModel → ReservationTable::save()
+   └─ Emits: onStockReserved
 
-3. extension_mailing (listens)
-   └─ Receives: onInventoryStockReserved
-   └─ Calls: EntityData\CustomerRepository::getCustomer()
-   └─ Sends: Stock reservation confirmation email
+3. ext_notifications (listens)
+   └─ Receives: onStockReserved
+   └─ Sends: Stock reservation confirmation
 
-4. com_emporium (User checks out)
-   └─ Creates order via AccountData\OrderRepository::save()
-   └─ Calls: InventoryData\StockReservationService::confirm()
-   └─ Calls: AccountData\OrderProcessingService::createInvoiceFromOrder()
+4. com_yourapp (User checks out)
+   └─ Creates order via OrderData\OrderModel → OrderTable::save()
+   └─ Calls: ProductData\StockReservationService::confirm()
 
-5. AccountData
-   └─ Confirms order, creates invoice
-   └─ Emits: onAccountDataOrderCreated, onAccountDataInvoiceCreated
-
-6. extension_invoicing (listens)
-   └─ Receives: onAccountDataInvoiceCreated
-   └─ Creates GL transactions via TransactionRepository::batch()
-
-7. extension_mailing (listens)
-   └─ Receives: onAccountDataInvoiceCreated
-   └─ Calls: AccountData\InvoiceRepository::getInvoice()
-   └─ Calls: EntityData\CustomerRepository::getCustomer()
-   └─ Sends: Invoice email
+5. OrderData
+   └─ Confirms order via OrderTable::save()
+   └─ Emits: onOrderCreated, onInvoiceCreated
 ```
 
-### Flow 2: Inventory Stock Level Changes
+### Flow 2: Stock Level Changes
 
 ```
-1. com_emporium (Admin)
+1. com_yourapp (Admin)
    └─ Admin updates item stock
-   └─ Calls: InventoryData\StockService::adjustStock()
+   └─ Calls: ProductData\StockService::adjustStock()
 
-2. InventoryData
-   └─ Adjusts stock
-   └─ Checks if below threshold
-   └─ Emits: onInventoryLowStock (if needed)
+2. ProductData
+   └─ Adjusts stock via StockModel → ProductTable::save()
+   └─ Checks threshold
+   └─ Emits: onLowStock (if needed)
 
-3. extension_mailing (listens)
-   └─ Receives: onInventoryLowStock
-   └─ Gets: InventoryData\ItemRepository::getItem()
-   └─ Sends: "Low stock alert" email to inventory manager
-
-4. extension_dropshipping (listens - future)
-   └─ Receives: onInventoryLowStock
-   └─ Auto-creates purchase order from Supplier
-   └─ Calls: AccountData\OrderRepository::save()
-```
-
-### Flow 3: Customer Updates Profile
-
-```
-1. com_emporium (Site)
-   └─ Customer updates profile
-   └─ Calls: EntityData\CustomerRepository::save()
-
-2. EntityData
-   └─ Saves customer changes
-   └─ Emits: onEntityCustomerUpdated
-
-3. com_emporium (Admin - listens)
-   └─ Receives: onEntityCustomerUpdated
-   └─ Updates related orders/invoices
-   └─ Calls: AccountData\OrderRepository::getOrdersByCustomer()
-
-4. extension_mailing (listens)
-   └─ Receives: onEntityCustomerUpdated
-   └─ Triggers: Profile update confirmation email
-
-5. com_inventorydata (may listen - future)
-   └─ If customer tier changed, recalculate pricing
-```
-
-### Flow 4: Payment Received
-
-```
-1. com_emporium (Admin)
-   └─ Admin records payment received
-   └─ Calls: AccountData\PaymentRepository::save()
-   └─ Calls: AccountData\PaymentProcessingService::applyPaymentToInvoice()
-
-2. AccountData
-   └─ Records payment
-   └─ Updates invoice balance
-   └─ Emits: onAccountDataPaymentReceived
-
-3. extension_invoicing (listens)
-   └─ Receives: onAccountDataPaymentReceived
-   └─ Creates GL transaction for payment
-   └─ Calls: AccountData\TransactionRepository::save()
-
-4. extension_mailing (listens)
-   └─ Receives: onAccountDataPaymentReceived
-   └─ Sends: Payment receipt to customer
+3. ext_notifications (listens)
+   └─ Receives: onLowStock
+   └─ Sends: "Low stock alert" to manager
 ```
 
 ---
 
 ## Reference Architecture
 
-### Service Registration Pattern
+### Service Registration Pattern (Model→Table)
 
-Each data layer registers its services in a service provider:
+Each data layer registers its services in a service provider. Services inject Models, not Repositories:
 
 ```php
-// com_inventorydata/services/provider.php
-$container->set(ItemRepository::class, function (Container $c) {
-    return new ItemRepository($c->get(DatabaseInterface::class));
+// com_productdata/services/provider.php
+$container->set(StockModel::class, function (Container $c) {
+    $model = new StockModel();
+    $model->setDatabase($c->get(DatabaseInterface::class));
+    return $model;
 });
 
 $container->set(StockReservationService::class, function (Container $c) {
     return new StockReservationService(
-        $c->get(DatabaseInterface::class),
-        $c->get(ItemRepository::class)
+        $c->get(StockModel::class),          // Model, not Repository
+        $c->get(ReservationModel::class),    // Model, not Repository
     );
 });
 ```
 
-### Service Injection Pattern
+### Service Injection Pattern (Model→Table)
 
 Domain extensions inject data layer services:
 
 ```php
-// com_emporium/src/Service/OrderService.php
-use Emporium\InventoryData\Repository\ItemRepository;
-use Emporium\EntityData\Repository\CustomerRepository;
-use Emporium\AccountData\Repository\OrderRepository;
+// com_yourapp/src/Service/OrderService.php
+use Vendor\Component\ProductData\Administrator\Model\StockModel;
+use Vendor\Component\CustomerData\Administrator\Model\CustomerModel;
 
 class OrderService {
     public function __construct(
-        private readonly ItemRepository $items,
-        private readonly CustomerRepository $customers,
-        private readonly OrderRepository $orders,
+        private readonly StockModel $stockModel,         // Model, not Repository
+        private readonly CustomerModel $customerModel,   // Model, not Repository
+        private readonly OrderModel $orderModel,         // Local Service Model
     ) {}
 
     public function createOrder(int $customerId, OrderData $data): Order {
-        // Use injected repositories
-        $customer = $this->customers->getCustomer($customerId);
-        $item = $this->items->getItem($data->itemId);
-        $order = new Order($data);
-        $orderId = $this->orders->save($order);
-        return $this->orders->getOrder($orderId);
+        // Use injected Models (which use Tables for writes)
+        $customer = $this->customerModel->getItem($customerId);
+        $stock = $this->stockModel->getAvailability($data->itemId);
+        return $this->orderModel->saveOrder($data); // Model → Table::save()
     }
 }
 ```
@@ -375,13 +204,13 @@ class OrderService {
 Other extensions listen to data layer events:
 
 ```php
-// extension_mailing/src/Plugin/MailingPlugin.php
-class MailingPlugin implements SubscriberInterface {
+// ext_notifications/src/Plugin/NotificationPlugin.php
+class NotificationPlugin implements SubscriberInterface {
     public static function getSubscribedEvents(): array {
         return [
-            'onInventoryLowStock' => 'alertLowStock',
-            'onAccountDataInvoiceCreated' => 'sendInvoiceEmail',
-            'onEntityCustomerCreated' => 'sendWelcomeEmail',
+            'onLowStock' => 'alertLowStock',
+            'onInvoiceCreated' => 'sendInvoiceEmail',
+            'onCustomerCreated' => 'sendWelcomeEmail',
         ];
     }
 
@@ -394,30 +223,6 @@ class MailingPlugin implements SubscriberInterface {
     }
 }
 ```
-
----
-
-## Extension Roles
-
-### Data Layer Extensions (3)
-
-| Extension | Role | Manages | Consumers |
-|---|---|---|---|
-| **com_inventorydata** | Inventory data access layer | Items, Stock, Categories, Reservations | emporium, invoicing, mailing, dropshipping |
-| **com_entitydata** | Entity data access layer | Customers, Suppliers, Businesses, Contacts | emporium, invoicing, mailing, accounting |
-| **com_accountdata** | Financial data access layer | Invoices, Orders, Payments, Transactions | emporium, invoicing, reporting, mailing |
-
-### Domain Extensions
-
-| Extension | Purpose | Data Layers Used |
-|---|---|---|
-| **com_emporium** | Multi-vendor marketplace | All three (primary consumer) |
-| **future_shop** | Single-vendor shop | InventoryData, EntityData |
-| **extension_events** | Events management | EntityData (venues, attendees) |
-| **extension_invoicing** | Accounting integration | AccountData (primary) |
-| **extension_mailing** | Email notifications | All three (reads data for emails) |
-| **extension_accounting** | GL management | AccountData (transactions, reconciliation) |
-| **extension_reporting** | Financial/inventory reports | AccountData, InventoryData |
 
 ---
 
@@ -436,42 +241,6 @@ class MailingPlugin implements SubscriberInterface {
 ✗ Data Layers → Other Data Layers (no direct dependencies)
 ```
 
-### Actual Dependencies
-
-```
-com_emporium
-  ├─ depends on: InventoryData, EntityData, AccountData
-  └─ emits: OrderPlaced, PaymentProcessed, UserRegistered
-
-future_shop
-  ├─ depends on: InventoryData, EntityData
-  └─ emits: OrderPlaced
-
-extension_invoicing
-  ├─ depends on: AccountData (primary)
-  └─ emits: InvoiceProcessed
-
-extension_mailing
-  ├─ depends on: EntityData (for contacts)
-  └─ consumes events from: All layers
-
-extension_reporting
-  ├─ depends on: InventoryData, AccountData
-  └─ generates: Reports (read-only)
-
-InventoryData (no dependencies on other data layers)
-  ├─ references: EntityData (supplier details - read-only)
-  └─ provides: ItemRepository, StockReservationService
-
-EntityData (no dependencies on other data layers)
-  └─ provides: CustomerRepository, SupplierRepository
-
-AccountData (no dependencies on other data layers)
-  ├─ references: InventoryData (item costs - read-only)
-  ├─ references: EntityData (customer/supplier IDs - read-only)
-  └─ provides: InvoiceRepository, OrderRepository
-```
-
 ---
 
 ## Data Consistency
@@ -480,90 +249,25 @@ AccountData (no dependencies on other data layers)
 
 | Data | Layer | Single Source |
 |---|---|---|
-| Items, Stock, Availability | InventoryData | ✓ |
-| Customers, Suppliers, Contacts | EntityData | ✓ |
-| Invoices, Orders, Payments | AccountData | ✓ |
-| Pricing | AccountData | ✓ |
-| Item Names/Descriptions | InventoryData | ✓ |
+| Products, Stock, Availability | ProductData | ✓ |
+| Customers, Suppliers, Contacts | CustomerData | ✓ |
+| Orders, Invoices, Payments | OrderData | ✓ |
 
 ### Data Snapshots (Read-Only References)
 
-When one layer references data from another, it typically snapshots the data:
+When one layer references data from another, store IDs and snapshots, not live objects:
 
 ```php
-// AccountData Order snapshots EntityData customer data
-class Order {
-    public int $customerId;           // Live reference
-    public string $customerName;      // Snapshot at order time
-    public string $customerAddress;   // Snapshot at order time
-}
-
-// AccountData Invoice snapshots InventoryData item data
-class LineItem {
+// ✓ CORRECT: ID reference + snapshot
+class OrderLineItem {
     public int $itemId;               // Live reference
-    public string $itemName;          // Snapshot at invoice time
-    public string $itemSku;           // Snapshot at invoice time
-    public float $unitPrice;          // From pricing at that time
+    public string $itemName;          // Snapshot at order time
+    public string $itemSku;           // Snapshot at order time
+    public float $unitPrice;          // Snapshot at order time
 }
 ```
 
-This prevents:
-- Customer name changes retroactively affecting old invoices
-- Item name changes affecting old order history
-- Old orders showing updated (incorrect) item names
-
----
-
-## Event Communication Patterns
-
-### Event Emission
-
-Data layers emit domain events when their data changes:
-
-```
-onInventoryItemCreated
-  → emitted by: InventoryData
-  → data: itemId, name, sku, categoryId
-  → consumed by: mailing (catalog update notification)
-
-onAccountDataInvoiceCreated
-  → emitted by: AccountData
-  → data: invoiceId, customerId, total, dueDate
-  → consumed by: mailing (send invoice), invoicing (create GL entry)
-
-onEntityCustomerUpdated
-  → emitted by: EntityData
-  → data: customerId, changes (array of modified fields)
-  → consumed by: mailing (alert user), emporium (refresh user data)
-```
-
-### Event Listening
-
-Domain extensions listen and react:
-
-```php
-// extension_mailing listens to multiple layers
-class MailingListener {
-    public function getSubscribedEvents() {
-        return [
-            'onInventoryLowStock' => 'sendAlert',
-            'onAccountDataInvoiceCreated' => 'sendInvoice',
-            'onEntityCustomerCreated' => 'sendWelcome',
-        ];
-    }
-}
-
-// com_emporium listens to updates
-class CacheInvalidator {
-    public function getSubscribedEvents() {
-        return [
-            'onInventoryItemUpdated' => 'invalidateItemCache',
-            'onEntityCustomerUpdated' => 'invalidateCustomerCache',
-            'onAccountDataPriceUpdated' => 'invalidatePriceCache',
-        ];
-    }
-}
-```
+This prevents old orders showing updated (incorrect) item names or prices.
 
 ---
 
@@ -572,22 +276,20 @@ class CacheInvalidator {
 ### ✓ DO:
 
 1. **Inject services** in constructors, not service locator
-2. **Use repositories** for all data access
+2. **Use Models→Tables** for all data access and writes
 3. **Listen to events** for inter-extension communication
 4. **Snapshot data** when referencing other layers
-5. **Document dependencies** in `.claude/project-ecosystem.md`
-6. **Keep data layers independent** (no cross-layer dependencies)
-7. **Use interfaces** for all services (allow mocking/testing)
+5. **Keep data layers independent** (no cross-layer dependencies)
+6. **Use interfaces** for all services (allow mocking/testing)
 
 ### ✗ DON'T:
 
-1. **Query directly** across database tables from different layers
-2. **Call services** from data layer without injection
-3. **Modify other extensions' data** without using their repositories
+1. **Use Repositories** — use Joomla's native Model→Table pattern
+2. **Write raw SQL in Models** — use Table classes for all writes
+3. **Query directly** across database tables from different layers
 4. **Create circular dependencies** between extensions
 5. **Store duplicate data** (violates single source of truth)
-6. **Emit events** from data layers that reference domain extensions
-7. **Hard-code** references to other extensions' namespaces
+6. **Hard-code** references to other extensions' namespaces
 
 ---
 
@@ -597,41 +299,15 @@ When adding a new domain extension:
 
 1. **Identify** what data it needs (which data layers)
 2. **Check** if required data layers exist
-3. **Define** required services in those layers (if missing)
-4. **Inject** repositories/services in your extension
+3. **Define** required services/models in those layers (if missing)
+4. **Inject** Models/services in your extension
 5. **Listen** to events for notifications from other layers
 6. **Emit** your own events for other extensions to consume
-7. **Document** in `.claude/project-ecosystem.md`
-
----
-
-## Future Extensibility
-
-### Adding New Data Layers
-
-If a new business domain needs dedicated data layer (e.g., com_shippingdata for shipping):
-
-1. Create new extension following same pattern
-2. Add services and repositories
-3. Emit events when data changes
-4. Document in PROJECT-ECOSYSTEM.md
-5. Existing domain extensions can inject without code changes
-
-### Adding New Domain Extensions
-
-Any new extension can:
-1. Inject existing data layer services
-2. Listen to data layer events
-3. Emit its own events
-4. Coordinate with other domain extensions
-
-No changes needed to data layers.
+7. **Document** in your project's ecosystem documentation
 
 ---
 
 ## Related Files
 
-- **Individual Project Docs**: `.claude/project-ecosystem.md` in each extension
 - **Integration Guide**: `INTERPROJECT-REFERENCES.md` (this folder)
-- **Architecture Patterns**: `joomla5-di-patterns.md`
-- **Code Standards**: `joomla-coding-preferences.md`
+- **Agent Usage**: `agent-usage-guide.md`

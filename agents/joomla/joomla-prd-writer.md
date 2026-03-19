@@ -250,6 +250,7 @@ The PRD is stored in two places:
 4. **Consider all user types** — admin, site visitor, API consumer
 5. **Include Joomla-specific concerns** — ACL, categories, language, SEF routing
 6. **Reference Joomla conventions** — standard fields, asset management, ordering
+7. **No Repository pattern** — Do NOT specify Repository interfaces or classes. Joomla extensions use the native Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) for all data access. Services interact with Models directly.
 
 ## Change Logging Protocol
 

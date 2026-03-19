@@ -93,11 +93,19 @@ COM_EXAMPLE_ITEM="Item"
 COM_EXAMPLE_ITEM_NEW="New Item"
 COM_EXAMPLE_ITEM_EDIT="Edit Item"
 
-; Field labels
+; Field labels (form fields)
 COM_EXAMPLE_FIELD_TITLE="Title"
 COM_EXAMPLE_FIELD_TITLE_DESC="Enter the item title"
 COM_EXAMPLE_FIELD_STATE="Status"
 COM_EXAMPLE_FIELD_CREATED="Created Date"
+
+; List view column headers — use _COLUMN_, NOT _HEADING_
+; Joomla core strings (JGRID_HEADING_ID, JSTATUS, JGLOBAL_TITLE, etc.) are used as-is.
+; Custom/entity-specific columns use COM_{NAME}_COLUMN_{FIELD}:
+COM_EXAMPLE_COLUMN_TITLE="Title"
+COM_EXAMPLE_COLUMN_PRICE="Price"
+COM_EXAMPLE_COLUMN_CATEGORY="Category"
+COM_EXAMPLE_COLUMN_CREATED="Created"
 
 ; Messages
 COM_EXAMPLE_ITEM_SAVED="Item saved successfully."
@@ -241,10 +249,11 @@ Text::script('COM_EXAMPLE_JS_CONFIRM_DELETE');
 2. **Constants are UPPERCASE** with underscores
 3. **Prefix matches extension type** — COM_, MOD_, PLG_
 4. **Field descriptions** always end with `_DESC` suffix
-5. **INI files are UTF-8** without BOM
-6. **Sort constants** alphabetically within sections
-7. **No duplicate constants** within a file
-8. **System strings** (`.sys.ini`) are minimal — name, description, menu items
+5. **List column headers** use `_COLUMN_` — e.g. `COM_EXAMPLE_COLUMN_TITLE`. NEVER use `_HEADING_`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are used as-is — only custom/entity-specific columns need `_COLUMN_`.
+6. **INI files are UTF-8** without BOM
+7. **Sort constants** alphabetically within sections
+8. **No duplicate constants** within a file
+9. **System strings** (`.sys.ini`) are minimal — name, description, menu items
 
 ## Change Logging Protocol
 

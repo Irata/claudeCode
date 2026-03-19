@@ -85,7 +85,7 @@ if /i not "%CONFIRM%"=="Y" (
 
 REM --- Step 1: Create project directory structure ---
 echo.
-echo [1/6] Creating project directory structure...
+echo [1/8] Creating project directory structure...
 
 if not exist "%PROJECT_DIR%" (
     mkdir "%PROJECT_DIR%"
@@ -106,7 +106,7 @@ if not exist "%CLAUDE_DIR%" (
 
 REM --- Step 2: Create CLAUDE.md from template ---
 echo.
-echo [2/6] Generating CLAUDE.md from template...
+echo [2/8] Generating CLAUDE.md from template...
 
 if not exist "%TEMPLATE%" (
     echo Error: Template not found at %TEMPLATE%
@@ -149,7 +149,7 @@ echo   Generated: %PROJECT_DIR%\CLAUDE.md
 
 REM --- Step 3: Create .claude documentation stubs ---
 echo.
-echo [3/6] Creating .claude documentation files...
+echo [3/8] Creating .claude documentation files...
 
 REM Create project-ecosystem.md stub
 set "ECOSYSTEM_FILE=%CLAUDE_DIR%\project-ecosystem.md"
@@ -319,7 +319,7 @@ if not exist "!ARCH_FILE!" (
 
 REM --- Step 4: Run agent symlinks ---
 echo.
-echo [4/6] Creating agent symlinks...
+echo [4/8] Creating agent symlinks...
 echo   (You will be prompted for each agent)
 echo.
 
@@ -328,13 +328,50 @@ echo !PROJECT_NAME!| call "%AGENTS_SCRIPT%"
 
 REM --- Step 5: Run include symlinks ---
 echo.
-echo [5/6] Creating include symlinks...
+echo [5/8] Creating include symlinks...
 echo   (You will be prompted for each include)
 echo.
 
 echo !PROJECT_NAME!| call "%INCLUDES_SCRIPT%"
 
-REM --- Step 6: Summary ---
+REM --- Step 6: Copy symlink.bat template into repository ---
+echo.
+echo [6/8] Copying symlink.bat to repository...
+
+set "SYMLINK_TEMPLATE=E:\repositories\ClaudeCode\templates\symlink.bat"
+set "SYMLINK_DEST=E:\repositories\!REPO_NAME!\symlink.bat"
+
+if not exist "%SYMLINK_TEMPLATE%" (
+    echo   Warning: Template not found at %SYMLINK_TEMPLATE% - skipping.
+) else if exist "!SYMLINK_DEST!" (
+    echo   Exists: !SYMLINK_DEST!
+) else (
+    copy "%SYMLINK_TEMPLATE%" "!SYMLINK_DEST!" >nul
+    echo   Copied: !SYMLINK_DEST!
+)
+
+REM --- Step 7: Copy Phing build templates ---
+echo.
+echo [7/8] Copying Phing build templates...
+
+set "PHING_TEMPLATE_DIR=E:\repositories\ClaudeCode\templates\Phing"
+set "PHING_DEST_DIR=E:\repositories\!REPO_NAME!\Phing"
+
+if not exist "!PHING_DEST_DIR!" (
+    mkdir "!PHING_DEST_DIR!"
+    echo   Created: !PHING_DEST_DIR!
+)
+
+for %%F in ("!PHING_TEMPLATE_DIR!\*.xml") do (
+    if not exist "!PHING_DEST_DIR!\%%~nxF" (
+        copy "%%F" "!PHING_DEST_DIR!\%%~nxF" >nul
+        echo   Copied: %%~nxF
+    ) else (
+        echo   Exists: %%~nxF
+    )
+)
+
+REM --- Step 8: Summary ---
 echo.
 echo ============================================
 echo   Project Initialization Complete
@@ -347,13 +384,17 @@ echo   .claude\architecture.md      (update with your design)
 echo   Agents: %CLAUDE_DIR%\agents\
 echo   Includes: %CLAUDE_DIR%\includes\
 echo.
+echo   Symlink: E:\repositories\!REPO_NAME!\symlink.bat
+echo   Phing:   E:\repositories\!REPO_NAME!\Phing\
+echo.
 echo   Next steps:
 echo   1. Open project in PHPStorm
 echo   2. Verify CLAUDE.md placeholders are replaced
 echo   3. Update .claude\project-ecosystem.md with your services
-echo   4. Start Claude Code in the project directory
-echo   5. Use the joomla-architect agent for design
-echo   6. Use the joomla-orchestrator agent for full builds
+echo   4. Run symlink.bat from the repository to link into Joomla
+echo   5. Start Claude Code in the project directory
+echo   6. Use the joomla-architect agent for design
+echo   7. Use the joomla-orchestrator agent for full builds
 echo.
 
 pause

@@ -317,8 +317,10 @@ namespace Emporium\EntityData\Entity;
 
 class Customer {
     public int $id;
+    public int $asset_id;
     public string $type;  // 'individual' or 'business'
     public string $name;
+    public string $alias;
     public string $email;
     public string $phone;
     public string $mobilePhone;
@@ -326,14 +328,21 @@ class Customer {
     public string $registrationNumber;  // For businesses
     public string $country;
     public string $currency;  // Preferred currency
-    public string $language;  // Preferred language
     public array $classifications;  // VIP, wholesale, retail, preferred
-    public string $status;  // 'active', 'inactive', 'suspended'
     public float $creditLimit;
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
-    public int $createdBy;
-    public int $modifiedBy;
+
+    // Standard Joomla system fields
+    public int $state;              // 1=published, 0=unpublished, 2=archived, -2=trashed
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 
     // Lazy-loaded relations
     public ?Business $business;  // If type='business'
@@ -349,7 +358,9 @@ namespace Emporium\EntityData\Entity;
 
 class Supplier {
     public int $id;
+    public int $asset_id;
     public string $name;
+    public string $alias;
     public string $code;  // Supplier code/ID
     public string $email;
     public string $phone;
@@ -360,11 +371,21 @@ class Supplier {
     public int $minimumOrderQuantity;
     public float $minimumOrderValue;
     public string $paymentTerms;  // Net 30, COD, etc.
-    public string $status;  // 'active', 'inactive', 'preferred', 'suspended'
     public float $rating;  // Quality rating
     public array $categories;  // Supplier categories
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Standard Joomla system fields
+    public int $state;              // 1=published, 0=unpublished, 2=archived, -2=trashed
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 
     // Lazy-loaded relations
     public array $contacts = [];
@@ -379,7 +400,9 @@ namespace Emporium\EntityData\Entity;
 
 class Business {
     public int $id;
+    public int $asset_id;
     public string $name;
+    public string $alias;
     public string $legalName;
     public string $registrationNumber;
     public string $taxId;
@@ -389,8 +412,19 @@ class Business {
     public int $employeeCount;
     public string $country;
     public string $founded;  // Year
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Standard Joomla system fields
+    public int $state;
+    public int $ordering;
+    public int $access;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
+    public ?int $checked_out;
+    public ?\DateTime $checked_out_time;
+    public string $language;
+    public string $note;
 
     // Relationships
     public ?int $parentBusinessId;  // If subsidiary
@@ -419,9 +453,13 @@ class Contact {
     public string $mobilePhone;
     public bool $primaryContact;
     public string $department;
-    public string $status;  // 'active', 'inactive'
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Secondary entity — minimum Joomla system fields
+    public int $state;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
 }
 ```
 
@@ -438,14 +476,19 @@ class Address {
     public string $line1;
     public string $line2;
     public string $city;
-    public string $state;
+    public string $stateProvince;
     public string $postalCode;
     public string $country;
     public string $phone;
     public bool $isPrimary;
     public string $deliveryInstructions;
-    public \DateTime $createdDate;
-    public \DateTime $modifiedDate;
+
+    // Secondary entity — minimum Joomla system fields
+    public int $state;
+    public \DateTime $created;
+    public int $created_by;
+    public ?\DateTime $modified;
+    public int $modified_by;
 }
 ```
 
@@ -453,6 +496,7 @@ class Address {
 ```php
 namespace Emporium\EntityData\Entity;
 
+// Link/join table — system fields NOT required, keep minimal
 class Relationship {
     public int $id;
     public int $fromId;  // Entity ID
@@ -460,7 +504,7 @@ class Relationship {
     public string $type;  // 'parent_company', 'subsidiary', 'affiliated', 'distributor', 'reseller'
     public string $status;  // 'active', 'inactive'
     public string $details;  // Additional context
-    public \DateTime $createdDate;
+    public \DateTime $created;
 }
 ```
 
@@ -605,75 +649,119 @@ class EntityListener {
 ## Database Tables
 
 ```sql
--- Customers
-CREATE TABLE `#__entitydata_customers` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    type ENUM('individual', 'business'),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE,
-    phone VARCHAR(20),
-    mobile_phone VARCHAR(20),
-    tax_id VARCHAR(50),
-    registration_number VARCHAR(50),
-    country VARCHAR(2),
-    currency VARCHAR(3),
-    language VARCHAR(5),
-    status ENUM('active', 'inactive', 'suspended') DEFAULT 'active',
-    credit_limit DECIMAL(12,2),
-    created_date DATETIME,
-    modified_date DATETIME,
-    created_by INT,
-    modified_by INT
-);
+-- Customers (CORE/CRUD table — full Joomla system fields)
+CREATE TABLE IF NOT EXISTS `#__entitydata_customers` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `type` ENUM('individual', 'business') NOT NULL DEFAULT 'individual',
+    `name` VARCHAR(255) NOT NULL DEFAULT '',
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    `email` VARCHAR(255),
+    `phone` VARCHAR(20),
+    `mobile_phone` VARCHAR(20),
+    `tax_id` VARCHAR(50),
+    `registration_number` VARCHAR(50),
+    `country` VARCHAR(2),
+    `currency` VARCHAR(3),
+    `credit_limit` DECIMAL(12,2),
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_email` (`email`),
+    KEY `idx_state` (`state`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_language` (`language`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Suppliers
-CREATE TABLE `#__entitydata_suppliers` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255),
-    phone VARCHAR(20),
-    website VARCHAR(255),
-    country VARCHAR(2),
-    tax_id VARCHAR(50),
-    lead_time INT,  -- Days
-    minimum_order_qty INT,
-    minimum_order_value DECIMAL(12,2),
-    payment_terms VARCHAR(50),
-    status ENUM('active', 'inactive', 'preferred', 'suspended') DEFAULT 'active',
-    rating DECIMAL(3,2),
-    created_date DATETIME,
-    modified_date DATETIME
-);
+-- Suppliers (CORE/CRUD table — full Joomla system fields)
+CREATE TABLE IF NOT EXISTS `#__entitydata_suppliers` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `name` VARCHAR(255) NOT NULL DEFAULT '',
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    `code` VARCHAR(50) NOT NULL,
+    `email` VARCHAR(255),
+    `phone` VARCHAR(20),
+    `website` VARCHAR(255),
+    `country` VARCHAR(2),
+    `tax_id` VARCHAR(50),
+    `lead_time` INT,                                -- Days
+    `minimum_order_qty` INT,
+    `minimum_order_value` DECIMAL(12,2),
+    `payment_terms` VARCHAR(50),
+    `rating` DECIMAL(3,2),
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_code` (`code`),
+    KEY `idx_state` (`state`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_language` (`language`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Addresses
-CREATE TABLE `#__entitydata_addresses` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    entity_id INT NOT NULL,
-    entity_type ENUM('customer', 'supplier', 'business'),
-    type ENUM('billing', 'shipping', 'headquarters', 'warehouse'),
-    name VARCHAR(100),
-    line1 VARCHAR(255),
-    line2 VARCHAR(255),
-    city VARCHAR(100),
-    state VARCHAR(100),
-    postal_code VARCHAR(20),
-    country VARCHAR(2),
-    phone VARCHAR(20),
-    is_primary TINYINT(1) DEFAULT 0,
-    delivery_instructions TEXT
-);
+-- Addresses (Secondary entity table — admin-managed, minimum system fields)
+CREATE TABLE IF NOT EXISTS `#__entitydata_addresses` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `entity_id` INT NOT NULL,
+    `entity_type` ENUM('customer', 'supplier', 'business') NOT NULL,
+    `type` ENUM('billing', 'shipping', 'headquarters', 'warehouse') NOT NULL,
+    `name` VARCHAR(100),
+    `line1` VARCHAR(255),
+    `line2` VARCHAR(255),
+    `city` VARCHAR(100),
+    `state_province` VARCHAR(100),
+    `postal_code` VARCHAR(20),
+    `country` VARCHAR(2),
+    `phone` VARCHAR(20),
+    `is_primary` TINYINT(1) NOT NULL DEFAULT 0,
+    `delivery_instructions` TEXT,
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_entity` (`entity_id`, `entity_type`),
+    KEY `idx_state` (`state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Relationships
-CREATE TABLE `#__entitydata_relationships` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    from_id INT NOT NULL,
-    to_id INT NOT NULL,
-    type VARCHAR(50),  -- parent_company, subsidiary, affiliated, distributor, reseller
-    status ENUM('active', 'inactive') DEFAULT 'active',
-    details TEXT,
-    created_date DATETIME
-);
+-- Relationships (Link/join table — system fields NOT required)
+CREATE TABLE IF NOT EXISTS `#__entitydata_relationships` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `from_id` INT NOT NULL,
+    `to_id` INT NOT NULL,
+    `type` VARCHAR(50),                             -- parent_company, subsidiary, affiliated, distributor, reseller
+    `status` ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    `details` TEXT,
+    `created` DATETIME NOT NULL,
+    PRIMARY KEY (`id`),
+    KEY `idx_from_id` (`from_id`),
+    KEY `idx_to_id` (`to_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ```
 
 ---

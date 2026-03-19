@@ -574,10 +574,53 @@ Store: mcp__serena__write_memory("architecture-{ext}-class-hierarchy", ...)
 Design:
 - Table definitions with field types, constraints, indexes
 - Foreign key relationships
-- Standard audit fields (created, created_by, modified, modified_by, checked_out, etc.)
-- State/workflow fields (published, ordering, access, language, etc.)
 - Joomla asset table integration (for ACL)
 - SQL install/update scripts versioning strategy
+- ENGINE=InnoDB, DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+
+CRITICAL: Classify each table and apply standard Joomla system fields accordingly:
+
+CORE/CRUD TABLES (user-managed entities — Items, Categories, Customers, Orders, etc.)
+MUST include ALL standard Joomla system fields:
+  - state TINYINT(1) NOT NULL DEFAULT 0      — 1=published, 0=unpublished, 2=archived, -2=trashed
+  - ordering INT NOT NULL DEFAULT 0           — Display order within lists
+  - access INT UNSIGNED NOT NULL DEFAULT 1    — Joomla access level
+  - created DATETIME NOT NULL                 — Record creation timestamp
+  - created_by INT UNSIGNED NOT NULL DEFAULT 0 — Creator user ID
+  - modified DATETIME                         — Last modification timestamp
+  - modified_by INT UNSIGNED NOT NULL DEFAULT 0 — Last modifier user ID
+  - checked_out INT UNSIGNED                  — Edit lock user ID
+  - checked_out_time DATETIME                 — Edit lock timestamp
+  Plus optional: asset_id, alias, publish_up, publish_down, language, note
+
+SECONDARY ENTITY TABLES (admin-managed — Addresses, Contacts, Tax Rates)
+Minimum: state, created, created_by, modified, modified_by
+
+LINK/JOIN TABLES (cross-references — item_tag_map, category_item)
+NOT required — keep columns minimal (foreign keys + optional ordering)
+
+SYSTEM/LOG TABLES (auto-generated — audit logs, stock movements)
+Only: created (timestamp), plus relevant foreign keys
+
+HIERARCHICAL/NESTED TABLES (entities with parent-child relationships):
+When a table has a `parent_id` column (adjacency list), it MUST also include
+nested set columns for efficient tree ordering and depth display in list views:
+
+  `level` INT UNSIGNED NOT NULL DEFAULT 0    — Depth in tree (0=root, 1=child, etc.)
+  `lft` INT NOT NULL DEFAULT 0               — Left boundary of nested set range
+  `rgt` INT NOT NULL DEFAULT 0               — Right boundary of nested set range
+  KEY `idx_lft` (`lft`)                      — Index for ORDER BY lft ASC
+
+The Service layer must implement `rebuildNestedSet()` to walk the adjacency list
+and compute lft/rgt/level. The AdminModel must trigger the rebuild on save.
+The ListModel must default to ORDER BY a.lft ASC and select level for indentation.
+The list view template renders indentation with:
+  str_repeat('<span class="gi">&mdash;</span>', (int) $item->level)
+
+Use Joomla naming: `created` not `created_at`, `modified` not `updated_at`,
+`state` not `status` for publication state.
+
+Include indexes on: state, created_by, access, checked_out, language, alias, lft (if hierarchical)
 
 Store: mcp__serena__write_memory("architecture-{ext}-db-schema", ...)
 ```

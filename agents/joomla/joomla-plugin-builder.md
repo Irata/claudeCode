@@ -53,22 +53,6 @@ You are a **Joomla 5 Plugin Builder**. You create plugins across all Joomla plug
    - includes/joomla5-depreciated.md
 ```
 
-## Plugin Structure
-
-```
-plugins/{group}/{name}/
-├── {name}.xml                    — Manifest (metadata, namespace, files only)
-├── config.xml                    — Configuration parameters
-├── language/en-GB/
-│   ├── plg_{group}_{name}.ini    — Language strings
-│   └── plg_{group}_{name}.sys.ini — System language strings
-├── services/
-│   └── provider.php              — DI service provider
-└── src/
-    └── Extension/
-        └── {Name}.php            — Main plugin class
-```
-
 ## Core Implementation Pattern
 
 ### Service Provider (`services/provider.php`)
@@ -118,6 +102,8 @@ use Joomla\Event\SubscriberInterface;
 
 final class {Name} extends CMSPlugin implements SubscriberInterface
 {
+    protected $autoloadLanguage = true;
+
     public static function getSubscribedEvents(): array
     {
         return [
@@ -202,16 +188,60 @@ public function handleAfterSave(AfterSaveEvent $event): void
 }
 ```
 
+## Accessing Component Services from Plugins
+
+When a plugin needs to call services registered in a component's DI container, use the `bootComponent()` pattern:
+
+```php
+use Vendor\Component\Example\Administrator\Service\SomeService;
+
+public function handleSomeEvent(SomeEvent $event): void
+{
+    /** @var SomeService $service */
+    $service = $this->getApplication()->bootComponent('com_example')
+        ->getContainer()
+        ->get(SomeService::class);
+
+    $result = $service->doSomething();
+}
+```
+
+**Prerequisites:**
+- The target component's Extension class must expose `getContainer()` (see `includes/joomla5-di-patterns.md`)
+- `bootComponent()` triggers the component's `boot()` method if not already called, ensuring the container is populated
+- This is the same internal pattern used by Akeeba Backup and other major extensions
+
+**When to use:** Any time a plugin needs business logic that lives in a component's service layer — e.g., processing payments, looking up records, triggering workflows. Do NOT duplicate the component's logic in the plugin.
+
+## Reading Another Plugin's Parameters
+
+When a plugin needs configuration from a different plugin (e.g., a HikaShop payment plugin reading the gateway profile from a Joomla payments plugin):
+
+```php
+use Joomla\CMS\Plugin\PluginHelper;
+use Joomla\Registry\Registry;
+
+$plugin = PluginHelper::getPlugin('payments', 'hikashop');
+if ($plugin) {
+    $params = new Registry($plugin->params);
+    $value = $params->get('some_param', 'default');
+}
+```
+
+This is useful when configuration should be centralised in one plugin but consumed by another at runtime.
+
 ## Key Rules
 
 1. **Always use `final class`** for plugin extension classes
 2. **Always implement `SubscriberInterface`** — never rely on magic method naming
-3. **Use typed event classes** from `Joomla\CMS\Event\*` namespace
-4. **Check context** in handlers to avoid processing irrelevant events
-5. **Keep handlers focused** — one concern per handler method
-6. **Don't throw exceptions** unless the operation must be blocked (e.g., `BeforeSaveEvent`)
-7. **For smaller plugins** keep everything in the Extension class
-8. **For complex plugins** separate logic into additional classes under `src/`
+3. **Always set `protected $autoloadLanguage = true;`** — without this, language strings are not loaded and `Text::_()` returns raw keys
+4. **Use typed event classes** from `Joomla\CMS\Event\*` namespace
+5. **Check context** in handlers to avoid processing irrelevant events
+6. **Keep handlers focused** — one concern per handler method
+7. **Don't throw exceptions** unless the operation must be blocked (e.g., `BeforeSaveEvent`)
+8. **For smaller plugins** keep everything in the Extension class
+9. **For complex plugins** separate logic into additional classes under `src/`
+10. **Use `bootComponent()` to access component services** — never duplicate service logic in plugins
 
 ## Language Constants
 
@@ -230,26 +260,21 @@ public function handleAfterSave(AfterSaveEvent $event): void
     <description>PLG_{GROUP}_{NAME}_DESCRIPTION</description>
     <namespace path="src">Vendor\Plugin\{Group}\{Name}</namespace>
     <files>
+        <folder plugin="{name}">src</folder>
         <folder>language</folder>
         <folder>services</folder>
-        <folder>src</folder>
     </files>
+    <config>
+        <fields name="params">
+            <fieldset name="basic">
+            </fieldset>
+        </fields>
+    </config>
 </extension>
 ```
 
-> **IMPORTANT:** Configuration parameters are defined in a separate `config.xml` file, NOT in the manifest XML. See `config.xml` template below.
-
 ### Config Template (`config.xml`)
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<config>
-    <fields name="params">
-        <fieldset name="basic">
-        </fieldset>
-    </fields>
-</config>
-```
+For Plugins the configuration parameters are in the manifest XML. 
 
 ## Change Logging Protocol
 

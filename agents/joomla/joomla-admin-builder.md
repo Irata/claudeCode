@@ -458,12 +458,52 @@ $container->set(CheckoutService::class, function (Container $container) {
 - Implement `BootableExtensionInterface`
 - Use `HTMLRegistryAwareTrait`
 - Register HTML helpers and custom services in `boot()`
+- **Expose the DI container** via `getContainer()` so controllers and external code can resolve services
+
+```php
+namespace Vendor\Component\Example\Administrator\Extension;
+
+use Joomla\CMS\Extension\BootableExtensionInterface;
+use Joomla\CMS\Extension\MVCComponent;
+use Joomla\CMS\HTML\HTMLRegistryAwareTrait;
+use Psr\Container\ContainerInterface;
+
+class ExampleComponent extends MVCComponent implements BootableExtensionInterface
+{
+    use HTMLRegistryAwareTrait;
+
+    private ?ContainerInterface $container = null;
+
+    /**
+     * @internal Used by controllers/plugins to resolve services.
+     *           Joomla's MVCComponent does not expose the container natively.
+     */
+    public function getContainer(): ContainerInterface
+    {
+        if ($this->container === null) {
+            throw new \RuntimeException('Component container not available. Has boot() been called?');
+        }
+
+        return $this->container;
+    }
+
+    #[\Override]
+    public function boot(ContainerInterface $container): void
+    {
+        $this->container = $container;
+        // Register event listeners, HTML helpers, etc.
+    }
+}
+```
+
+**Why this is needed:** Joomla's `MVCComponent` does not natively expose the DI container. This bridge pattern (also used by Akeeba Backup) lets controllers resolve registered services. See `includes/joomla5-di-patterns.md` for the full pattern.
 
 ### 3. Controllers
 Controllers delegate to services for business logic; they handle HTTP concerns only.
 
 **Controller responsibilities**:
 - Parse HTTP request
+- Resolve services via `bootComponent()->getContainer()->get()`
 - Call appropriate service method
 - Handle response formatting
 - Check authorization with ACL
@@ -473,17 +513,18 @@ Controllers delegate to services for business logic; they handle HTTP concerns o
 - Query building (that's models)
 - Data transformation (that's services/models)
 
+**Resolving services in controllers:**
+
+Controllers cannot use constructor injection for custom services (Joomla's MVCFactory doesn't support it). Instead, resolve services from the component's DI container via `bootComponent()`:
+
 ```php
 <?php
 
 namespace Vendor\Component\Example\Administrator\Controller;
 
+use Vendor\Component\Example\Administrator\Service\TrolleyService;
+
 class TrolleyController extends AdminController {
-    public function __construct(
-        private readonly TrolleyService $trolleyService,
-    ) {
-        parent::__construct(...);
-    }
 
     public function addItem(): void {
         $this->checkToken(); // CSRF validation
@@ -492,9 +533,15 @@ class TrolleyController extends AdminController {
             throw new \Exception('Not authorized');
         }
 
+        // Resolve service from the component's DI container
+        /** @var TrolleyService $trolleyService */
+        $trolleyService = $this->app->bootComponent('com_example')
+            ->getContainer()
+            ->get(TrolleyService::class);
+
         try {
             // Business logic delegated to service
-            $this->trolleyService->addToTrolley(
+            $trolleyService->addToTrolley(
                 userId: $this->getApplication()->getIdentity()->id,
                 itemId: (int)$this->getApplication()->getInput()->get('item_id'),
                 quantity: (int)$this->getApplication()->getInput()->get('quantity')
@@ -514,7 +561,8 @@ class TrolleyController extends AdminController {
 - **Form controllers**: Extend `FormController` — handle single item CRUD (delegate to services)
 - **Display controller**: Extend `BaseController` for default display routing
 - Use constructor promotion with `readonly` properties
-- Always include CSRF token validation via `$this->checkToken()` for state-changing operations
+- Always include CSRF token validation via `$this->checkToken()` for state-changing operations — NEVER use `Session::checkToken() || jexit()` (both `jexit()` and the `Session::checkToken()` pattern are deprecated)
+- Use `$this->app` for application access in MVC controllers — it is always initialized in `BaseController::__construct()`. Note: `getApplication()` does NOT exist on MVC controllers.
 
 ### 4. Models
 - **List models**: Extend `ListModel` — implement `getListQuery()` with prepared statements and `ParameterType` binding, `populateState()` for filters/sorting
@@ -524,19 +572,166 @@ class TrolleyController extends AdminController {
 
 ### 5. Views
 - Extend `HtmlView`
-- **CRITICAL**: Use direct model calls, NOT deprecated `$this->get()`:
-  ```php
-  // WRONG (deprecated in 5.3.0)
-  $this->items = $this->get('Items');
-
-  // CORRECT
-  $model = $this->getModel();
-  $this->items = $model->getItems();
-  $this->pagination = $model->getPagination();
-  $this->state = $model->getState();
-  ```
+- **CRITICAL**: `$this->get('Items')`, `$this->get('Form')`, `$this->get('Pagination')`, `$this->get('State')` are **deprecated in 5.3.0 and removed in 7.0** — NEVER use them. Use `$this->getModel()->getItems()` etc. See reference templates below.
 - Set up toolbar in `addToolbar()` method with ACL checks
 - Configure document title and breadcrumbs
+- **Toolbar buttons that open modals**:
+- Use `standardButton` with `->onclick('')` to suppress Joomla's default `Joomla.submitbutton()`.
+- Use `->listCheck(true)` if the button should be disabled until list items are selected. In the template, set `data-bs-toggle="modal"` and `data-bs-target="#modalId"` on the button via JavaScript, and load Bootstrap's modal module with `HTMLHelper::_('bootstrap.modal', '#modalId')`. Never use `new bootstrap.Modal()` — Joomla 5 loads Bootstrap as ES modules, not globals.
+
+#### ListView Reference Template
+Use this as the base for ALL administrator list views:
+```php
+<?php
+
+defined('_JEXEC') or die;
+
+namespace {Vendor}\Component\{Name}\Administrator\View\{Entities};
+
+use Joomla\CMS\Helper\ContentHelper;
+use Joomla\CMS\Language\Text;
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use Joomla\CMS\Toolbar\ToolbarHelper;
+
+class HtmlView extends BaseHtmlView
+{
+    protected $items;
+    protected $pagination;
+    protected $state;
+    public $filterForm;
+    public $activeFilters;
+
+    #[\Override]
+    public function display($tpl = null): void
+    {
+        // CORRECT: Direct model calls — NEVER use $this->get('Items')
+        $model              = $this->getModel();
+        $this->items        = $model->getItems();
+        $this->pagination   = $model->getPagination();
+        $this->state        = $model->getState();
+        $this->filterForm   = $model->getFilterForm();
+        $this->activeFilters = $model->getActiveFilters();
+
+        $this->addToolbar();
+
+        parent::display($tpl);
+    }
+
+    protected function addToolbar(): void
+    {
+        $canDo = ContentHelper::getActions('com_{name}');
+
+        ToolbarHelper::title(Text::_('COM_{NAME}_{ENTITIES}'), 'generic');
+
+        if ($canDo->get('core.create')) {
+            ToolbarHelper::addNew('{entity}.add');
+        }
+
+        if ($canDo->get('core.delete')) {
+            ToolbarHelper::deleteList('JGLOBAL_CONFIRM_DELETE', '{entities}.delete');
+        }
+    }
+}
+```
+
+#### FormView Reference Template
+Use this as the base for ALL administrator edit/form views:
+```php
+<?php
+
+defined('_JEXEC') or die;
+
+namespace {Vendor}\Component\{Name}\Administrator\View\{Entity};
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\Helper\ContentHelper;
+use Joomla\CMS\Language\Text;
+use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
+use Joomla\CMS\Toolbar\ToolbarHelper;
+
+class HtmlView extends BaseHtmlView
+{
+    protected $form;
+    protected $item;
+    protected $state;
+
+    #[\Override]
+    public function display($tpl = null): void
+    {
+        // CORRECT: Direct model calls — NEVER use $this->get('Form')
+        $model       = $this->getModel();
+        $this->form  = $model->getForm();
+        $this->item  = $model->getItem();
+        $this->state = $model->getState();
+
+        $this->addToolbar();
+
+        // REQUIRED: Load form validator for form-validate class on <form> element.
+        // Without this, Save/Apply buttons throw: document.formvalidator is undefined
+        $this->document->getWebAssetManager()->useScript('form.validate');
+
+        parent::display($tpl);
+    }
+
+    protected function addToolbar(): void
+    {
+        Factory::getApplication()->getInput()->set('hidemainmenu', true);
+
+        $isNew = ($this->item->id == 0);
+        $canDo = ContentHelper::getActions('com_{name}');
+
+        ToolbarHelper::title(
+            Text::_('COM_{NAME}_{ENTITY}_' . ($isNew ? 'NEW' : 'EDIT')),
+            'pencil-alt'
+        );
+
+        if ($canDo->get('core.edit') || $canDo->get('core.create')) {
+            ToolbarHelper::apply('{entity}.apply');
+            ToolbarHelper::save('{entity}.save');
+            ToolbarHelper::save2new('{entity}.save2new');
+        }
+
+        ToolbarHelper::cancel('{entity}.cancel', $isNew ? 'JTOOLBAR_CANCEL' : 'JTOOLBAR_CLOSE');
+    }
+}
+```
+
+### Hierarchical Entities (Parent-Child Tree Display)
+
+When an entity has a `parent_id` column (adjacency list), the admin list view must display items in tree order with visual indentation. This requires nested set columns (`lft`, `rgt`, `level`) in the database and specific patterns in the model, view, and form.
+
+**Database columns required** (in addition to `parent_id`):
+```sql
+`level` INT UNSIGNED NOT NULL DEFAULT 0,
+`lft` INT NOT NULL DEFAULT 0,
+`rgt` INT NOT NULL DEFAULT 0,
+KEY `idx_lft` (`lft`)
+```
+
+**ListModel requirements:**
+1. Add `level`, `a.level`, `lft`, `a.lft` to `filter_fields` in the constructor
+2. Select `a.level` and `a.lft` in `getListQuery()`
+3. Default ordering to `a.lft ASC` in both `populateState()` and the `getListQuery()` fallback
+
+**AdminModel requirements:**
+- Override `save()` to call the entity Service's `rebuildNestedSet()` after `parent::save()` — this recomputes `lft`/`rgt`/`level` from the adjacency list
+
+**Service layer requirements:**
+- Implement `rebuildNestedSet()` which:
+  1. Loads all rows' `id` and `parent_id`
+  2. Groups children by `parent_id` into an adjacency list
+  3. Walks the tree depth-first, assigning `lft`, `rgt`, and `level`
+  4. Updates each row in the database
+
+**List template indentation:**
+```php
+<?php echo str_repeat('<span class="gi">&mdash;</span>', (int) $item->level); ?>
+```
+Place this immediately before the title link in the title `<td>`.
+
+**Edit form parent field:**
+- Use `type="sql"` (NOT `type="list"`) to dynamically load items from the database
+- Include a static `<option value="0">` for the root/no-parent option
 
 ### 6. Table Classes (`src/Table/`)
 - Extend `Table`
@@ -551,12 +746,15 @@ class TrolleyController extends AdminController {
 - Use Joomla form field types (text, list, editor, calendar, media, etc.)
 - Include filter and validation attributes
 - Define filter fields for list views in `filter_*.xml`
+- **Do NOT include a `fullordering` field** in `<fields name="list">` — column headings already provide sorting via `HTMLHelper::_('searchtools.sort', ...)`. Only include the `limit` (limitbox) field in the `list` fieldset.
 
 ### 8. Templates (`tmpl/`)
 - List view: Use `Joomla\CMS\Layout\LayoutHelper` for standard list layouts
 - Edit view: Use `HTMLHelper::_('uitab.startTabSet')` for tabbed interfaces
 - Include CSRF tokens: `HTMLHelper::_('form.token')`
 - Use Web Asset Manager for CSS/JS loading
+- **List column header language strings**: Use `COM_{NAME}_COLUMN_{FIELD}` for custom columns (e.g. `COM_EXAMPLE_COLUMN_PRICE`). NEVER use `_HEADING_`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are used directly — only entity-specific columns need the `_COLUMN_` convention.
+- **Bootstrap modals**: Always load via `HTMLHelper::_('bootstrap.modal', '#modalId')` before the modal markup. This registers the modal with Joomla's Web Asset Manager and loads the Bootstrap modal ES module. Use Bootstrap's data-API (`data-bs-toggle`, `data-bs-target`, `data-bs-dismiss`) for open/close — never construct `new bootstrap.Modal()` in JavaScript.
 
 ### 9. ACL (`access.xml`, `config.xml`)
 - Define component-level actions per architect's ACL matrix
@@ -564,9 +762,57 @@ class TrolleyController extends AdminController {
 - Support asset-level permissions for per-item ACL
 
 ### 10. SQL Scripts
-- `sql/install.mysql.utf8.sql` — CREATE TABLE statements
+- `sql/install.mysql.utf8.sql` — CREATE TABLE statements (must reflect the cumulative current schema)
 - `sql/uninstall.mysql.utf8.sql` — DROP TABLE statements
 - `sql/updates/mysql/` — Version-numbered update scripts
+
+**Version Synchronisation (V.R.M):** When a schema change is needed, **ASK the user** whether to:
+- **Append** to the current (latest) SQL update file — no version changes needed
+- **Create a new** SQL update file with the next version number — then also bump:
+  1. **Manifest XML** `<version>` in `admin/com_{name}/{name}.xml`
+  2. **Phing build file** `version` property in `Phing/com_{name}.xml`
+
+All three must use the same V.R.M value when a new update file is created.
+
+**Reset rules:** Incrementing **V** resets R and M to `0`. Incrementing **R** resets M to `0`.
+
+**Standard Joomla system fields for core/CRUD tables** (tables where users create, edit, delete records):
+
+```sql
+CREATE TABLE IF NOT EXISTS `#__example_items` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `asset_id` INT UNSIGNED NOT NULL DEFAULT 0,
+    `title` VARCHAR(255) NOT NULL DEFAULT '',
+    `alias` VARCHAR(400) NOT NULL DEFAULT '',
+    -- ... entity-specific fields ...
+    `state` TINYINT(1) NOT NULL DEFAULT 0,
+    `ordering` INT NOT NULL DEFAULT 0,
+    `access` INT UNSIGNED NOT NULL DEFAULT 1,
+    `created` DATETIME NOT NULL,
+    `created_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `modified` DATETIME,
+    `modified_by` INT UNSIGNED NOT NULL DEFAULT 0,
+    `checked_out` INT UNSIGNED,
+    `checked_out_time` DATETIME,
+    `publish_up` DATETIME,
+    `publish_down` DATETIME,
+    `language` CHAR(7) NOT NULL DEFAULT '*',
+    `note` VARCHAR(255) NOT NULL DEFAULT '',
+    PRIMARY KEY (`id`),
+    KEY `idx_state` (`state`),
+    KEY `idx_created_by` (`created_by`),
+    KEY `idx_access` (`access`),
+    KEY `idx_checked_out` (`checked_out`),
+    KEY `idx_language` (`language`),
+    KEY `idx_alias` (`alias`(191))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```
+
+**Table classification:**
+- **Core/CRUD tables** (user-managed): Include ALL system fields above
+- **Secondary entity tables** (admin-managed): Minimum `state`, `created`, `created_by`, `modified`, `modified_by`
+- **Link/join tables** (cross-references): System fields NOT required — minimal columns only
+- **System/log tables** (auto-generated): Only `created` timestamp
 
 ## PHP 8.3+ Standards
 

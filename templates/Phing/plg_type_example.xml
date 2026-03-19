@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================  -->
+<!-- Plugin: example - something                 -->
+<!-- ============================================  -->
+<project name="plg_example_something" default="build">
+
+	<property name="version"   value="1.0.1" override="true" />
+    <property name="sourcedir"   value="E:/repositories/example/plugins/example/" override="true" />
+	<property name="targetdir" value="e:/Extensions/install_files/plg_type_something" override="true" />
+	<property name="ext_name"   value="something" override="true" />
+	<property name="ext_prefix"   value="plg_example_" override="true" />
+	
+    <!-- ============================================  -->
+    <!-- Target: build                                 -->
+    <!-- ============================================  -->
+    <target name="build" >
+    	
+		<echo msg="Deleting existing folders and files before building new target..." />
+		<echo msg="-----------------------------------" />
+		<delete dir="${targetdir}" />
+
+    <echo msg="Copying files to build directory..." />
+
+			<copy todir="${targetdir}" preservelastmodified="true">
+				<fileset dir="${sourcedir}/${ext_name}">
+					<include name="**/*" />
+					<exclude name="**/*.zip" />
+				</fileset>
+			</copy>
+			<echo msg=" " />
+        
+		<zip destfile="${targetdir}.${version}.zip">
+			<fileset dir="${targetdir}">
+				<include name="**/**" />
+			</fileset>
+		</zip>
+		
+    </target>
+
+</project>

@@ -328,31 +328,65 @@ Each agent reads the memories written by upstream agents before starting work.
 
 ---
 
-## Service Layer Architecture Pattern
+## Joomla First — Service Layer Architecture Pattern
 
 ### What is a Service?
 
 A **Service** encapsulates business logic and domain operations. Services are the single source of truth for "what the system does" and are reused across Admin, Site, API, and CLI contexts.
 
-### Service vs. Controller vs. Model
+### Joomla First Architecture: Controller → Model → Table
+
+**Standard MVC CRUD** (list/form pages with toolbar buttons):
+```
+Controller (AdminController/FormController)
+    → Model (ListModel/FormModel/AdminModel)
+        → Table (extends Joomla\CMS\Table\Table)
+            → Database
+```
+
+**Service Layer** (business logic beyond CRUD):
+```
+Service (business logic orchestrator)
+    → ServiceModel (BaseDatabaseModel subclass)
+        → Table (same Table classes used by MVC)
+            → Database
+```
+
+**Critical Rule**: Models MUST NOT write directly to the database via raw SQL. All writes go through Table classes: `Table::save()`, `Table::delete()`, `Table::publish()`. Models MAY use raw SQL for SELECT queries (read operations).
+
+### Service vs. Controller vs. Model vs. Table
 
 | Layer | Responsibility | Examples |
 |-------|-----------------|----------|
 | **Controller** | HTTP request handling, authorization, response formatting | Parse request, check ACL, call service, format response |
 | **Service** | Business logic, workflows, validations, calculations | `addToTrolley()`, `checkout()`, `recalculateTotals()` |
-| **Model** | Data retrieval and abstraction | `getItem()`, `getItems()`, `save()`, query building |
+| **Model** | Data retrieval, query building, state management, delegates writes to Table | `getItem()`, `getListQuery()`, `save()` (which calls Table) |
+| **Table** | Single-row CRUD, field validation, database writes | `save()`, `delete()`, `publish()`, `check()`, `bind()` |
 
 ### Service Layer Design
 
-All Joomla 5 extensions should have a `src/Service/` folder in the Administrator layer:
+All Joomla 5 extensions with business logic should have a `src/Service/` folder in the Administrator layer, with corresponding Service Models in `src/Model/`:
 
 ```
-Acme\Component\Emporium\Administrator\Service\
-├── TrolleyService.php         — Add/remove/manage trolley items
-├── CheckoutService.php        — Validate and process orders
-├── InventoryService.php       — Reserve/release/update stock
-└── OrderService.php           — Manage orders after checkout
+Acme\Component\Bookstore\Administrator\
+├── Service\
+│   ├── CheckoutService.php        — Validate and process orders
+│   ├── InventoryService.php       — Reserve/release/update stock
+│   ├── RentalService.php          — Manage book rentals
+│   └── ReviewService.php          — Manage reviews and ratings
+├── Model\
+│   ├── BookModel.php              — MVC FormModel for book edit form
+│   ├── BooksModel.php             — MVC ListModel for book list view
+│   ├── StockModel.php             — Service Model for InventoryService
+│   ├── RentalModel.php            — Service Model for RentalService
+│   └── ReviewModel.php            — Service Model for ReviewService
+└── Table\
+    ├── BookTable.php              — Shared by BookModel and StockModel
+    ├── RentalTable.php            — Used by RentalModel
+    └── ReviewTable.php            — Used by ReviewModel
 ```
+
+**Note**: MVC Models (BookModel/BooksModel) stay within their controller/view triad. Service Models (StockModel, RentalModel) are purpose-built for their service's needs. Both use the same Table classes for writes.
 
 ### How Services are Reused Across Contexts
 
@@ -385,7 +419,13 @@ All call the same business logic — NO DUPLICATION
 **Service Definition** (`Administrator\Service\TrolleyService`):
 ```php
 class TrolleyService {
-    public function addToTrolley(int $userId, int $itemId, int $qty): void { ... }
+    public function __construct(
+        private readonly TrolleyModel $trolleyModel,  // Service Model (BaseDatabaseModel)
+    ) {}
+
+    public function addToTrolley(int $userId, int $itemId, int $qty): void {
+        $this->trolleyModel->addItem($userId, $itemId, $qty); // Model uses Table::save()
+    }
     public function removeFromTrolley(int $userId, int $itemId): void { ... }
     public function recalculateTotals(int $userId): void { ... }
     public function getTrolley(int $userId): array { ... }
@@ -455,21 +495,19 @@ Create a service when you have:
 
 ### Service Dependency Injection
 
-Services are registered in the DI container in `services/provider.php`:
+Services are registered in the DI container in `services/provider.php`. Services inject Models (not Repositories), and Models use Table classes for writes:
 
 ```php
 $container->set(TrolleyService::class, function (Container $c) {
     return new TrolleyService(
-        $c->get(DatabaseInterface::class),
-        $c->get(ItemModel::class),
-        $c->get(PricingService::class)  // Service depends on other services
+        $c->get(TrolleyModel::class),        // Service Model (BaseDatabaseModel)
     );
 });
 
 $container->set(CheckoutService::class, function (Container $c) {
     return new CheckoutService(
         $c->get(TrolleyService::class),      // Depends on TrolleyService
-        $c->get(OrderService::class),        // Depends on OrderService
+        $c->get(OrderModel::class),          // Service Model for orders
         $c->get(PaymentGateway::class)       // Depends on external service
     );
 });
@@ -596,6 +634,19 @@ After implementation, use the code-reviewer to verify:
 - API endpoints use same services ✓
 - CLI commands use same services ✓
 - No duplicate business logic anywhere ✓
+
+### 11. Joomla First Code Review Checklist
+The `joomla-code-reviewer` should verify these Joomla First compliance items:
+1. **No Repository pattern** — Models handle all data access, no `*Repository` classes
+2. **No raw SQL writes** — All INSERT/UPDATE/DELETE go through Table classes (`save()`, `delete()`, `publish()`)
+3. **Model→Table for all writes** — Models call `$this->getTable()` for mutations
+4. **Services use Models, not Repositories** — Service constructors inject Models
+5. **Joomla classes used** — No raw PHP where Joomla provides an equivalent (Factory, Input, Uri, Date, Language, etc.)
+6. **Standard MVC for CRUD** — ListModel/FormModel/AdminModel for list/form pages
+7. **DI injection, not service locator** — Constructor injection, not `Factory::getContainer()->get()`
+
+### 12. PROJECT-ECOSYSTEM.md and INTERPROJECT-REFERENCES.md
+These documents (`docs/PROJECT-ECOSYSTEM.md` and `docs/INTERPROJECT-REFERENCES.md`) are **generic templates** for multi-extension ecosystems. They are NOT default project files — only use them when a project has multiple extensions that share data layers. Copy and customize for your specific project.
 
 ---
 

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ============================================  -->
+<!-- Component: Example                           -->
+<!-- ============================================  -->
+<project name="com_example" default="build">
+
+	<property name="version"   value="0.0.1" override="true" />
+	<property name="ext_name"   value="example" override="true" />
+	<property name="ext_prefix"   value="com_" override="true" />
+	<property name="extension"   value="${ext_prefix}${ext_name}" override="true" />
+
+    <property name="sourcedir" value="E:/repositories/somewhere" override="true" />
+    <property name="targetdir" value="E:/Extensions/install_files/${extension}" override="true" />
+
+    <!-- ============================================  -->
+    <!-- Target: build                                 -->
+    <!-- ============================================  -->
+    <target name="build" >
+    	
+		<echo msg="Deleting existing folders and files before building new target..." />
+		<echo msg="-----------------------------------" />
+		<delete dir="${targetdir}" />
+		<delete file="${targetdir}.${version}.zip"/>
+
+    <echo msg="Copying files to build directory..." />
+		<echo msg="-----------------------------------" />
+		
+        <echo msg="Copying Admin files ..." />
+			<copy todir="${targetdir}/administrator/" preservelastmodified="true" >
+				<fileset dir="${sourcedir}/admin/${ext_prefix}${ext_name}">
+					<include name="**/**" />
+					<exclude name="${extension}.xml" />
+				</fileset>
+			</copy>
+			<echo msg=" " />
+		<echo msg="Copying API files ..." />
+			<copy todir="${targetdir}/api/" preservelastmodified="true">
+				<fileset dir="${sourcedir}/api/${ext_prefix}${ext_name}">
+					<include name="**/*" />
+					<exclude name="${extension}.xml" />
+				</fileset>
+			</copy>
+			<echo msg=" " />
+		
+		<echo msg="Copying Site files ..." />
+			<copy todir="${targetdir}/site/" preservelastmodified="true">
+				<fileset dir="${sourcedir}/site/${ext_prefix}${ext_name}">
+					<include name="**/*" />
+				</fileset>
+			</copy>
+			<echo msg=" " />
+
+		<echo msg="Copying Media files ..." />
+			<copy todir="${targetdir}/media/" preservelastmodified="true">
+				<fileset dir="${sourcedir}/media/${ext_prefix}${ext_name}">
+					<include name="**/*" />
+					<exclude name="**/fetchOptions.js" />
+				</fileset>
+			</copy>
+			<echo msg=" " />
+		
+        <echo msg="Copying Extensions .xml file ..." />
+			<copy file="${sourcedir}/admin/${ext_prefix}${ext_name}/${ext_name}.xml" todir="${targetdir}" preservelastmodified="true"/>
+
+		<zip destfile="${targetdir}.${version}.zip">
+			<fileset dir="${targetdir}">
+				<include name="**/**" />
+			</fileset>
+		</zip>
+	</target>
+
+</project>

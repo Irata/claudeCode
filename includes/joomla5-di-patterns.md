@@ -248,6 +248,23 @@ $service = $app->bootComponent('com_example')
 - The `@internal` docblock on `getContainer()` signals that this is a bridge method, not a public extension point
 - **Never call `getContainer()` from within the component's own models or views** — those should use constructor injection via the service provider
 
+### DataModel + Service Registration Pattern
+
+DataModels are the sole database access layer for Service classes. They are registered via `MVCFactoryInterface::createModel()` and injected into Services:
+
+```php
+// DataModel registration (needs MVCFactory for database access + Table creation)
+$container->set(BoardDataModel::class, fn(Container $c) =>
+    $c->get(MVCFactoryInterface::class)->createModel('BoardData', 'Administrator', ['ignore_request' => true])
+);
+
+// Service registration (DataModels only — no DatabaseInterface)
+$container->set(BoardService::class, fn(Container $c) => new BoardService(
+    $c->get(BoardDataModel::class),
+    $c->get(AuditService::class),
+));
+```
+
 ### Anti-Patterns to Avoid
 
 ```php
@@ -262,9 +279,14 @@ public function __construct()
     $this->db = Factory::getContainer()->get(DatabaseInterface::class);
 }
 
-// RIGHT: Constructor injection
+// WRONG: Service injecting DatabaseInterface (bypasses DataModel layer)
 public function __construct(
     private readonly DatabaseInterface $db
+) {}
+
+// RIGHT: Service injecting DataModel
+public function __construct(
+    private readonly BoardDataModel $dataModel
 ) {}
 
 // WRONG: Using global state

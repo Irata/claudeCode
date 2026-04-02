@@ -491,7 +491,10 @@ During code review, verify each layer follows the pattern:
 - [ ] **Views** use `$this->getModel()->getPagination()` — NOT deprecated `$this->get('Pagination')`
 - [ ] **Views** use `$this->getModel()->getState()` — NOT deprecated `$this->get('State')`
 - [ ] **Views** use `$this->getModel()->getForm()` — NOT deprecated `$this->get('Form')`
-- [ ] **Services** contain business logic that might be shared
+- [ ] **Services** contain business logic only — zero database access (`$db->`, `getQuery()`, `execute()`, Table references)
+- [ ] **Services** inject DataModels (not `DatabaseInterface` or `MVCFactoryInterface`)
+- [ ] **DataModels** are the sole database access layer for Services
+- [ ] **DataModels** use Table classes internally for CUD operations (bind/check/store/delete)
 - [ ] No code references Site/API/CLI specific concerns
 
 #### **Site Layer Validation**

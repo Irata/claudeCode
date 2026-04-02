@@ -16,6 +16,7 @@
 - **Joomla Instance**: `E:\www\{{DOMAIN}}`
 - **Build Output**: `E:\repositories\{{REPO_NAME}}\build`
 - **Phing Configuration**: `E:\repositories\{{REPO_NAME}}\build.xml`
+- **Work Log**: `E:\repositories\{{REPO_NAME}}\Files\work-log.md`
 
 ## Database
 
@@ -219,6 +220,7 @@ Agents share context via Serena memory files. Convention:
 | `joomla-security-auditor` | Security analysis | Security review before release |
 | `joomla-performance-agent` | Performance | Analyzing slow queries/assets |
 | `data-model-architect` | Database schema | Designing database structure |
+| `work-log-manager` | Development activity logging | Updating the project work log |
 
 ## Serena Memory Conventions
 

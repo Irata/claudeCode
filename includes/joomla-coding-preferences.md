@@ -25,6 +25,7 @@
 ### Design Patterns
 - Do NOT use the Repository design pattern in Joomla extensions. Use Joomla's native Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) for all data access.
 - Models handle database queries, state management, and business logic — there is no need for a separate Repository layer.
+- Services MUST NOT access the database directly. All data access flows through DataModel methods.
 
 ### Manifest XML Naming
 - Component manifest files MUST be named `{name}.xml` (e.g. `forum.xml`, `community.xml`), **NOT** `com_{name}.xml`.
@@ -60,16 +61,25 @@
   - **Create a new** SQL update file with the next version number
 - Only when a **new** SQL update file is created should the manifest and Phing versions be bumped to match
 - Appending to the current file requires no version changes — this supports iterative development before deployment
+- **When bumping the version**, also review the `<creationDate>` element in the manifest XML and update it to the current month and year (e.g. `<creationDate>March 2026</creationDate>`) if it does not reflect the current date
 
-### Git Commit Message Convention
-- Commit messages for extension changes MUST include the extension name and its current V.R.M version from the manifest XML
-- Format: `{extension_name} {V.R.M} - meaningful description`
-- Examples:
-  - `com_forum 0.0.8 - Fix nested set rebuild and add utilities toolbar`
-  - `plg_webservices_forum 1.0.0 - Add board API endpoint`
-  - `com_community 0.0.2 - Add partner management CRUD`
+### Git Commit Message Convention — Conventional Commits
+- All projects MUST use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) syntax
+- Format: `<type>(<scope>): <description> [<version>]`
+- **type** (required): `feat`, `fix`, `refactor`, `docs`, `chore`, `build`, `perf`, `test`, `style`, `ci`
+- **scope** (required): extension name (e.g. `com_forum`, `plg_webservices_forum`) or `project` for cross-cutting changes
+- **description** (required): imperative mood, lowercase, no trailing period
+- **version** (when applicable): `[V.R.M]` appended to subject when the manifest version has changed
 - The version number is read from the `<version>` element in the extension's manifest XML
+- Examples:
+  - `feat(com_forum): add hits column to boards, topics, and messages [0.1.1]`
+  - `fix(com_forum): prevent null column errors with CheckDefaultsTrait`
+  - `refactor(com_forum): delegate all database access to DataModels [0.1.0]`
+  - `docs(com_community): update language files for space entity`
+  - `build(plg_webservices_forum): update Phing build for new API routes [1.0.0]`
+  - `chore(project): update shared documentation files`
 - For commits touching multiple extensions, create separate commits per extension
+- A `commit-msg` git hook SHOULD be used to enforce the format in each repository
 
 ### DatabaseQuery `bind()` — By-Reference Gotcha
 - `DatabaseQuery::bind()` accepts its value parameter **by reference** (`&$value`)
@@ -255,3 +265,11 @@ KEY `idx_lft` (`lft`)
 - The trait file exists in each component's `Model` namespace (same namespace, no import needed)
 - Add `use DebugErrorAwareTrait;` as the first statement inside the class body
 - BaseDatabaseModel subclasses (DataModels, DashboardModel) do NOT need the trait
+
+### DataModel Pattern
+- DataModels extend `BaseDatabaseModel`, named `{Entity}DataModel.php`
+- DataModels are the **sole database access layer** for Service classes
+- Service classes MUST NOT access the database directly — all data via DataModels
+- DataModels use Table classes internally for CUD operations (bind/check/store/delete)
+- Documented exceptions for bulk/atomic operations stay as direct SQL in DataModels
+- DataModels are registered in `services/provider.php` via `MVCFactoryInterface::createModel()`

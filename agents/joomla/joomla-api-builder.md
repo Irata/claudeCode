@@ -135,6 +135,8 @@ class TrolleyController extends ApiController {
 
 All business logic, validation, query building, and data access remain in the Administrator layer and are reused without duplication.
 
+**Data access chain**: API Controller → Service → DataModel → Table (for CUD) / direct SQL (for reads). Services never access the database directly — all data flows through DataModel methods.
+
 ### Pattern Overview
 
 **API Models:**

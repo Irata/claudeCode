@@ -110,17 +110,17 @@ The **Service Layer** encapsulates business logic and domain operations separate
 - `CheckoutService` manages checkout workflow (validate, process, confirm)
 - Don't put everything in one mega-service
 
-**2. Dependency Injection**
+**2. Dependency Injection — DataModels Only (no DatabaseInterface)**
 ```php
 class TrolleyService {
     public function __construct(
-        private readonly DatabaseInterface $db,
-        private readonly ItemModel $itemModel,
-        private readonly TrolleyModel $trolleyModel,
+        private readonly TrolleyDataModel $trolleyDataModel,
+        private readonly ItemDataModel $itemDataModel,
         private readonly PricingService $pricing,
     ) {}
 }
 ```
+Services MUST NOT inject `DatabaseInterface` or `MVCFactoryInterface`. All data access flows through DataModel methods. DataModels use Table classes internally for CUD validation.
 
 **3. Clear Interfaces**
 ```php
@@ -203,10 +203,13 @@ All four contexts use the **same** `TrolleyService` — no duplication of busine
 
 When designing services, document:
 1. **Which services are needed** — list all domain operations
-2. **What each service does** — document responsibilities
-3. **What services depend on** — models, other services, utilities
-4. **How services are registered in DI** — service provider registration
-5. **Which contexts use which services** — Admin, Site, API, CLI usage
+2. **What each service does** — document responsibilities (business logic only, zero database access)
+3. **What DataModels each service depends on** — DataModels are the sole database access layer
+4. **What other services each service depends on** — service composition
+5. **How services are registered in DI** — DataModel + Service registration in provider.php
+6. **Which contexts use which services** — Admin, Site, API, CLI usage
+
+**Data access chain**: Controller → Service → DataModel → Table (for CUD) / direct SQL (for reads & documented exceptions)
 
 Store in: `mcp__serena__write_memory("architecture-{ext}-service-layer", {...})`
 

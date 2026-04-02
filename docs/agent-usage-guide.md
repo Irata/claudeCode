@@ -388,6 +388,31 @@ Acme\Component\Bookstore\Administrator\
 
 **Note**: MVC Models (BookModel/BooksModel) stay within their controller/view triad. Service Models (StockModel, RentalModel) are purpose-built for their service's needs. Both use the same Table classes for writes.
 
+### Data Access Rules for Services
+
+Services orchestrate business logic but MUST NOT access the database directly. All data flows through DataModel classes:
+
+```
+Service (business logic orchestration only — NO database access)
+  ├── DataModel (ALL database access — extends BaseDatabaseModel)
+  │     ├── SELECT queries (direct SQL via getDatabase())
+  │     └── CUD operations (via Table bind/check/store/delete internally)
+  └── Other Services (composition)
+```
+
+**Rules**:
+- Services MUST NOT inject `DatabaseInterface` or `MVCFactoryInterface`
+- Services MUST NOT create or access Table classes directly
+- ALL database access (reads AND writes) goes through DataModel methods
+- DataModels use Table classes internally for CUD validation and persistence
+- DataModels are registered in `services/provider.php` via `MVCFactoryInterface::createModel()`
+
+**Documented exceptions** (direct SQL in DataModels, no Table):
+1. **Bulk batch operations** — e.g. `rebuildNestedSet()` updating lft/rgt/level per-row
+2. **Atomic increments** — e.g. `SET count = count + 1` (cannot be expressed via Table::store)
+3. **Bulk updates** — e.g. moving all messages when a topic changes board
+4. **Bulk deletes** — e.g. `purgeOldEntries()` audit/error log cleanup
+
 ### How Services are Reused Across Contexts
 
 ```
@@ -495,22 +520,28 @@ Create a service when you have:
 
 ### Service Dependency Injection
 
-Services are registered in the DI container in `services/provider.php`. Services inject Models (not Repositories), and Models use Table classes for writes:
+Services are registered in the DI container in `services/provider.php`. Services inject DataModels only (never `DatabaseInterface` or `MVCFactoryInterface`). DataModels are created via `MVCFactoryInterface::createModel()`:
 
 ```php
-$container->set(TrolleyService::class, function (Container $c) {
-    return new TrolleyService(
-        $c->get(TrolleyModel::class),        // Service Model (BaseDatabaseModel)
-    );
-});
+// DataModel registration (needs MVCFactory for database access + Table creation)
+$container->set(TrolleyDataModel::class, fn(Container $c) =>
+    $c->get(MVCFactoryInterface::class)->createModel('TrolleyData', 'Administrator', ['ignore_request' => true])
+);
 
-$container->set(CheckoutService::class, function (Container $c) {
-    return new CheckoutService(
-        $c->get(TrolleyService::class),      // Depends on TrolleyService
-        $c->get(OrderModel::class),          // Service Model for orders
-        $c->get(PaymentGateway::class)       // Depends on external service
-    );
-});
+$container->set(OrderDataModel::class, fn(Container $c) =>
+    $c->get(MVCFactoryInterface::class)->createModel('OrderData', 'Administrator', ['ignore_request' => true])
+);
+
+// Service registration (DataModels only — no DatabaseInterface)
+$container->set(TrolleyService::class, fn(Container $c) => new TrolleyService(
+    $c->get(TrolleyDataModel::class),
+));
+
+$container->set(CheckoutService::class, fn(Container $c) => new CheckoutService(
+    $c->get(TrolleyService::class),         // Depends on TrolleyService
+    $c->get(OrderDataModel::class),         // DataModel for orders
+    $c->get(PaymentGateway::class),         // Depends on external service
+));
 ```
 
 Then inject into controllers/commands/plugins:
@@ -640,10 +671,13 @@ The `joomla-code-reviewer` should verify these Joomla First compliance items:
 1. **No Repository pattern** — Models handle all data access, no `*Repository` classes
 2. **No raw SQL writes** — All INSERT/UPDATE/DELETE go through Table classes (`save()`, `delete()`, `publish()`)
 3. **Model→Table for all writes** — Models call `$this->getTable()` for mutations
-4. **Services use Models, not Repositories** — Service constructors inject Models
-5. **Joomla classes used** — No raw PHP where Joomla provides an equivalent (Factory, Input, Uri, Date, Language, etc.)
-6. **Standard MVC for CRUD** — ListModel/FormModel/AdminModel for list/form pages
-7. **DI injection, not service locator** — Constructor injection, not `Factory::getContainer()->get()`
+4. **Services use DataModels only** — Service constructors inject DataModels (never `DatabaseInterface` or `MVCFactoryInterface`)
+5. **Services contain no database access** — No `$db->`, `getQuery()`, `execute()`, or Table references in Service classes
+6. **DataModels are the sole database access layer** — All Service data access goes through DataModel methods
+7. **DataModel CUD uses Table internally** — DataModel create/update/delete methods use Table bind/check/store/delete for validation
+8. **Joomla classes used** — No raw PHP where Joomla provides an equivalent (Factory, Input, Uri, Date, Language, etc.)
+9. **Standard MVC for CRUD** — ListModel/FormModel/AdminModel for list/form pages
+10. **DI injection, not service locator** — Constructor injection, not `Factory::getContainer()->get()`
 
 ### 12. PROJECT-ECOSYSTEM.md and INTERPROJECT-REFERENCES.md
 These documents (`docs/PROJECT-ECOSYSTEM.md` and `docs/INTERPROJECT-REFERENCES.md`) are **generic templates** for multi-extension ecosystems. They are NOT default project files — only use them when a project has multiple extensions that share data layers. Copy and customize for your specific project.

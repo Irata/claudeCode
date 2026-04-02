@@ -320,21 +320,20 @@ namespace Vendor\Component\Example\Administrator\Service;
 
 defined('_JEXEC') or die;
 
-use Joomla\Database\DatabaseInterface;
-use Joomla\Database\ParameterType;
-use Vendor\Component\Example\Administrator\Model\ItemModel;
+use Vendor\Component\Example\Administrator\Model\ItemDataModel;
+use Vendor\Component\Example\Administrator\Model\TrolleyDataModel;
 
 class TrolleyService
 {
     public function __construct(
-        private readonly DatabaseInterface $db,
-        private readonly ItemModel $itemModel,
+        private readonly TrolleyDataModel $trolleyDataModel,
+        private readonly ItemDataModel $itemDataModel,
     ) {}
 
     public function addToTrolley(int $userId, int $itemId, int $quantity): void
     {
         // Validate item exists and is available
-        $item = $this->itemModel->getItem($itemId);
+        $item = $this->itemDataModel->getItem($itemId);
         if (!$item || $item->published !== 1) {
             throw new \Exception('Item not available');
         }
@@ -343,17 +342,12 @@ class TrolleyService
             throw new \Exception('Insufficient inventory');
         }
 
-        // Add to trolley (in database)
-        $query = $this->db->getQuery(true)
-            ->insert($this->db->quoteName('#__example_trolley'))
-            ->columns($this->db->quoteName(['user_id', 'item_id', 'quantity']))
-            ->values(
-                (int)$userId . ', ' .
-                (int)$itemId . ', ' .
-                (int)$quantity
-            );
-
-        $this->db->setQuery($query)->execute();
+        // Add to trolley — DataModel handles all database access via Table internally
+        $this->trolleyDataModel->createEntry([
+            'user_id'  => $userId,
+            'item_id'  => $itemId,
+            'quantity' => $quantity,
+        ]);
 
         // Recalculate totals
         $this->recalculateTrolley($userId);
@@ -361,59 +355,108 @@ class TrolleyService
 
     public function removeFromTrolley(int $userId, int $itemId): void
     {
-        $query = $this->db->getQuery(true)
-            ->delete($this->db->quoteName('#__example_trolley'))
-            ->where($this->db->quoteName('user_id') . ' = :user')
-            ->where($this->db->quoteName('item_id') . ' = :item')
-            ->bind(':user', $userId, ParameterType::INTEGER)
-            ->bind(':item', $itemId, ParameterType::INTEGER);
-
-        $this->db->setQuery($query)->execute();
-
+        $this->trolleyDataModel->removeEntry($userId, $itemId);
         $this->recalculateTrolley($userId);
     }
 
     public function recalculateTrolley(int $userId): void
     {
-        // Complex calculation logic
-        $query = $this->db->getQuery(true)
-            ->select('SUM(price * quantity) as total')
-            ->from($this->db->quoteName('#__example_trolley'))
-            ->where($this->db->quoteName('user_id') . ' = :user')
-            ->bind(':user', $userId, ParameterType::INTEGER);
+        // Complex calculation logic — reads via DataModel
+        $total = $this->trolleyDataModel->getTrolleyTotal($userId);
 
-        $total = $this->db->setQuery($query)->loadResult();
-
-        // Update trolley total
-        // ...
+        // Update trolley total via DataModel
+        $this->trolleyDataModel->updateTrolleyTotal($userId, $total);
     }
 
     public function emptyTrolley(int $userId): void
     {
-        $query = $this->db->getQuery(true)
-            ->delete($this->db->quoteName('#__example_trolley'))
-            ->where($this->db->quoteName('user_id') . ' = :user')
-            ->bind(':user', $userId, ParameterType::INTEGER);
-
-        $this->db->setQuery($query)->execute();
+        // Bulk delete — documented exception for direct SQL in DataModel
+        $this->trolleyDataModel->emptyTrolley($userId);
     }
 
     public function getTrolley(int $userId): array
     {
-        $query = $this->db->getQuery(true)
-            ->select('*')
-            ->from($this->db->quoteName('#__example_trolley'))
-            ->where($this->db->quoteName('user_id') . ' = :user')
-            ->bind(':user', $userId, ParameterType::INTEGER);
+        return $this->trolleyDataModel->getTrolleyItems($userId);
+    }
+}
+```
 
-        return $this->db->setQuery($query)->loadAssocList();
+**DataModel** — All database access for the Service lives here:
+```php
+<?php
+
+namespace Vendor\Component\Example\Administrator\Model;
+
+defined('_JEXEC') or die;
+
+use Joomla\CMS\MVC\Model\BaseDatabaseModel;
+use Joomla\Database\ParameterType;
+
+class TrolleyDataModel extends BaseDatabaseModel
+{
+    /**
+     * CUD method — uses Table internally for validation via check()/store().
+     */
+    public function createEntry(array $data): int
+    {
+        $table = $this->getMVCFactory()->createTable('Trolley', 'Administrator');
+        $table->bind($data);
+
+        if (!$table->check()) {
+            throw new \RuntimeException($table->getError());
+        }
+        if (!$table->store()) {
+            throw new \RuntimeException($table->getError());
+        }
+
+        return (int) $table->id;
+    }
+
+    public function getTrolleyItems(int $userId): array
+    {
+        $db    = $this->getDatabase();
+        $query = $db->getQuery(true)
+            ->select('*')
+            ->from($db->quoteName('#__example_trolley'))
+            ->where($db->quoteName('user_id') . ' = :userId')
+            ->bind(':userId', $userId, ParameterType::INTEGER);
+
+        return $db->setQuery($query)->loadAssocList();
+    }
+
+    public function getTrolleyTotal(int $userId): float
+    {
+        $db    = $this->getDatabase();
+        $query = $db->getQuery(true)
+            ->select('SUM(price * quantity)')
+            ->from($db->quoteName('#__example_trolley'))
+            ->where($db->quoteName('user_id') . ' = :userId')
+            ->bind(':userId', $userId, ParameterType::INTEGER);
+
+        return (float) $db->setQuery($query)->loadResult();
+    }
+
+    /**
+     * Bulk delete — documented exception (direct SQL, no Table).
+     */
+    public function emptyTrolley(int $userId): void
+    {
+        $db    = $this->getDatabase();
+        $query = $db->getQuery(true)
+            ->delete($db->quoteName('#__example_trolley'))
+            ->where($db->quoteName('user_id') . ' = :userId')
+            ->bind(':userId', $userId, ParameterType::INTEGER);
+
+        $db->setQuery($query)->execute();
     }
 }
 ```
 
 **Key points**:
-- Services contain **business logic only** (calculations, validations, workflows)
-- Services use **models to load/save data** (they don't access database directly for queries)
+- Services contain **business logic only** (calculations, validations, workflows) — **zero database access**
+- Services inject **DataModels** (not `DatabaseInterface`) for all data access
+- DataModels use **Table classes internally** for CUD operations (bind/check/store/delete)
+- Documented exceptions (bulk deletes, atomic increments) stay as direct SQL **within DataModels**
 - Services are **reused by all contexts** (Admin, Site, API, CLI)
 - Services are **registered in the DI container** for dependency injection
 
@@ -435,20 +478,26 @@ Register all services, factories, and the extension class:
 
 Example service registration in provider:
 ```php
-$container->set(TrolleyService::class, function (Container $container) {
-    return new TrolleyService(
-        $container->get(DatabaseInterface::class),
-        $container->get(ItemModel::class)
-    );
-});
+// DataModel registration — uses MVCFactory for database access + Table creation
+$container->set(TrolleyDataModel::class, fn(Container $c) =>
+    $c->get(MVCFactoryInterface::class)->createModel('TrolleyData', 'Administrator', ['ignore_request' => true])
+);
 
-$container->set(CheckoutService::class, function (Container $container) {
-    return new CheckoutService(
-        $container->get(DatabaseInterface::class),
-        $container->get(TrolleyService::class),
-        $container->get(EmailService::class)
-    );
-});
+$container->set(ItemDataModel::class, fn(Container $c) =>
+    $c->get(MVCFactoryInterface::class)->createModel('ItemData', 'Administrator', ['ignore_request' => true])
+);
+
+// Service registration — DataModels + other Services only (no DatabaseInterface)
+$container->set(TrolleyService::class, fn(Container $c) => new TrolleyService(
+    $c->get(TrolleyDataModel::class),
+    $c->get(ItemDataModel::class),
+));
+
+$container->set(CheckoutService::class, fn(Container $c) => new CheckoutService(
+    $c->get(TrolleyService::class),
+    $c->get(OrderDataModel::class),
+    $c->get(EmailService::class),
+));
 ```
 
 **Follow patterns from**: `includes/joomla5-di-patterns.md`

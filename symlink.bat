@@ -43,6 +43,16 @@ if not exist "%REPO_DIR%" (
     exit /b 1
 )
 
+set /p EXT_SUBDIR="Extensions subdirectory (press Enter if at repo root): "
+if not "%EXT_SUBDIR%"=="" (
+    set "REPO_DIR=%REPO_DIR%\%EXT_SUBDIR%"
+    if not exist "!REPO_DIR!" (
+        echo Error: Extensions directory not found at !REPO_DIR!
+        pause
+        exit /b 1
+    )
+)
+
 set /p DOMAIN="Joomla instance folder name (under E:\www\): "
 if "%DOMAIN%"=="" (
     echo Error: Domain name cannot be empty.

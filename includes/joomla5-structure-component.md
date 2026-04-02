@@ -17,9 +17,9 @@
 │   │   │   ├── Controller/
 │   │   │   ├── Event/
 │   │   │   ├── Extension/
-│   │   │   ├── Model/
+│   │   │   ├── Model/             ← Three types: {Entity}Model (AdminModel), {Entities}Model (ListModel), {Entity}DataModel (BaseDatabaseModel for Services)
 │   │   │   ├── View/
-│   │   │   ├── Service/
+│   │   │   ├── Service/           ← Business logic; inject DataModels only, never DatabaseInterface
 │   │   │   ├── Table/
 │   │   │   └── Helper
 │   │   └── tmpl/

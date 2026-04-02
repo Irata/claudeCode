@@ -334,20 +334,20 @@ echo.
 
 echo !PROJECT_NAME!| call "%INCLUDES_SCRIPT%"
 
-REM --- Step 6: Copy symlink.bat template into repository ---
+REM --- Step 6: Symlink symlink.bat into repository ---
 echo.
-echo [6/8] Copying symlink.bat to repository...
+echo [6/8] Linking symlink.bat into repository...
 
-set "SYMLINK_TEMPLATE=E:\repositories\ClaudeCode\templates\symlink.bat"
+set "SYMLINK_SOURCE=E:\repositories\ClaudeCode\symlink.bat"
 set "SYMLINK_DEST=E:\repositories\!REPO_NAME!\symlink.bat"
 
-if not exist "%SYMLINK_TEMPLATE%" (
-    echo   Warning: Template not found at %SYMLINK_TEMPLATE% - skipping.
+if not exist "%SYMLINK_SOURCE%" (
+    echo   Warning: Source not found at %SYMLINK_SOURCE% - skipping.
 ) else if exist "!SYMLINK_DEST!" (
     echo   Exists: !SYMLINK_DEST!
 ) else (
-    copy "%SYMLINK_TEMPLATE%" "!SYMLINK_DEST!" >nul
-    echo   Copied: !SYMLINK_DEST!
+    mklink "!SYMLINK_DEST!" "%SYMLINK_SOURCE%" >nul
+    echo   Linked: !SYMLINK_DEST! -^> %SYMLINK_SOURCE%
 )
 
 REM --- Step 7: Copy Phing build templates ---
@@ -384,7 +384,7 @@ echo   .claude\architecture.md      (update with your design)
 echo   Agents: %CLAUDE_DIR%\agents\
 echo   Includes: %CLAUDE_DIR%\includes\
 echo.
-echo   Symlink: E:\repositories\!REPO_NAME!\symlink.bat
+echo   Symlink: E:\repositories\!REPO_NAME!\symlink.bat -^> ClaudeCode\symlink.bat
 echo   Phing:   E:\repositories\!REPO_NAME!\Phing\
 echo.
 echo   Next steps:

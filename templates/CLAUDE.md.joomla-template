@@ -220,7 +220,15 @@ Agents share context via Serena memory files. Convention:
 | `joomla-security-auditor` | Security analysis | Security review before release |
 | `joomla-performance-agent` | Performance | Analyzing slow queries/assets |
 | `data-model-architect` | Database schema | Designing database structure |
-| `work-log-manager` | Development activity logging | Updating the project work log |
+
+## Skills (Shared)
+
+Skills are symlinked from `E:\repositories\ClaudeCode\skills\` into each project's `.claude\skills\` directory via `create_skill_symlinks.bat`. They are project-agnostic and shared across all projects.
+
+| Skill | Purpose | Example |
+|-------|---------|---------|
+| `/version-bump` | Bump V.R.M version across manifest, Phing, and SQL files | `/version-bump modification` |
+| `/work-log` | Scan repository for changes and append daily entries to work log | `/work-log include today` |
 
 ## Serena Memory Conventions
 
@@ -257,6 +265,7 @@ Agents share context via Serena memory files. Convention:
 - [ ] Create PHPStorm project at `E:\PHPStorm Project Files\{{PROJECT_NAME}}`
 - [ ] Run `E:\repositories\ClaudeCode\agents\create_agent_symlinks.bat` to deploy agents to this project
 - [ ] Run `E:\repositories\ClaudeCode\includes\create_include_symlinks.bat` to link documentation
+- [ ] Run `E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat` to link shared skills
 - [ ] Create `.claude/project-ecosystem.md` documenting services this extension provides/consumes
 - [ ] Configure database connection `{{DB_CONNECTION_NAME}}` in Joomla
 - [ ] Set up Joomla development instance at `E:\www\{{DOMAIN}}`

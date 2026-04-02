@@ -1,19 +1,19 @@
 ---
-name: work-log-manager
-description: "Use this agent to update the project work log. Invoke it at the start of each session or when the user asks to update the work log. The agent scans the repository for files modified since the last logged date, analyses changes, and appends structured daily entries to the work log. It is project-agnostic — it reads the Repository path and Project Name from the project's CLAUDE.md."
-tools:
-  - Read
-  - Write
-  - Edit
-  - Bash
-  - Grep
-  - Glob
-model: sonnet
+name: work-log
+description: Scan the repository for file modifications and append structured daily entries to the project work log
+disable-model-invocation: true
+argument-hint: include today
 ---
 
-# Work Log Manager Agent
+# Work Log
 
-You are a development activity logger. Your job is to scan a project repository for file modifications and generate structured daily work log entries.
+Scan the project repository for file modifications since the last logged date and append structured daily entries to the work log.
+
+## Arguments
+
+`$ARGUMENTS` is optional:
+- **`include today`** — include today's date in the scan range (default stops at yesterday)
+- If no argument is provided, scan up to yesterday only
 
 ## Core Principles
 
@@ -23,17 +23,17 @@ You are a development activity logger. Your job is to scan a project repository 
 4. **Append only** — never modify existing entries; only add new ones at the end of the file
 5. **Be concise but informative** — group related changes by functional area, explain *what* and *why*
 
-## Workflow
+## Steps
 
-### Step 1: Discover Project Context
+### 1. Discover Project Context
 
-Read the project's `CLAUDE.md` (it is auto-loaded into your context). Extract:
+Read the project's `CLAUDE.md` (it is auto-loaded into context). Extract:
 - **Project Name** — from the `## Project Configuration` section (e.g. `SANE`)
 - **Repository** — from the `## Directory Paths` section (e.g. `E:\repositories\Sane`)
 
 If these values cannot be found, report the error and stop.
 
-### Step 2: Locate or Initialise Work Log
+### 2. Locate or Initialise Work Log
 
 The work log lives at `{Repository}/Files/work-log.md`.
 
@@ -50,17 +50,17 @@ The work log lives at `{Repository}/Files/work-log.md`.
 ---
 ```
 
-### Step 3: Determine Date Range
+### 3. Determine Date Range
 
 Find the last `## YYYY-MM-DD` heading in the existing work log. The scan range is:
 - **Start**: last entry date + 1 day
-- **End**: yesterday's date (unless the prompt includes "include today", in which case end = today)
+- **End**: yesterday's date (unless `$ARGUMENTS` includes "include today", in which case end = today)
 
 If the work log has no entries yet, scan from 30 days ago (or a reasonable lookback).
 
 If there are no dates to scan (last entry = yesterday, or last entry = today when "include today"), report that the work log is up to date and stop.
 
-### Step 4: Scan for Modifications
+### 4. Scan for Modifications
 
 For each date in the range, scan the repository for modified files:
 
@@ -93,7 +93,7 @@ find "{Repository}" \
   -printf "%TY-%Tm-%Td %p\n" 2>/dev/null | sort
 ```
 
-### Step 5: Analyse Changes
+### 5. Analyse Changes
 
 For each date with modifications:
 
@@ -103,7 +103,7 @@ For each date with modifications:
 4. **List files changed** — compile a summary file list (not every single file, but the key ones)
 5. **Write the "In short" summary** — 1-2 sentences capturing the essence of the day
 
-### Step 6: Verify Day Names
+### 6. Verify Day Names
 
 Before writing any entry, verify the day-of-week:
 ```bash
@@ -112,7 +112,7 @@ date -d "YYYY-MM-DD" +%A
 
 This is critical. Never assume or calculate the day name yourself.
 
-### Step 7: Generate and Append Entries
+### 7. Generate and Append Entries
 
 Append new entries to the end of `work-log.md` following this exact format:
 
@@ -143,9 +143,9 @@ Append new entries to the end of `work-log.md` following this exact format:
 - If only one area of work, still use `### 1.` numbering
 - Keep descriptions factual — describe what was done, not speculation about intent
 
-### Step 8: Report Results
+### 8. Report Results
 
-After appending, report to the caller:
+After appending, report:
 - How many new entries were added
 - Which dates were covered
 - A brief note if any dates were skipped (no modifications found)

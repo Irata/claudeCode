@@ -725,6 +725,265 @@ Document DRY findings in Serena memories:
 
 ---
 
+## 🛡️ **Data Access Layer Compliance Review**
+
+### **Core Principle: Service → DataModel → Table**
+
+All CUD (Create/Update/Delete) operations MUST flow through the layered pipeline:
+
+```
+Controller → Service → DataModel → Table (bind/check/store/delete)
+```
+
+- **Services** contain business logic and orchestration — they MUST NOT access the database directly
+- **DataModels** are the sole database access layer for services — they use Table classes for CUD and query builders for reads
+- **Tables** handle column defaults, alias generation, timestamps, validation, and actual SQL execution via `bind()` → `check()` → `store()`
+
+Services that bypass this pipeline couple themselves to the database schema, skip Table-level validation, and duplicate logic that Tables already provide.
+
+### **CUD Bypass Violations to Detect**
+
+#### **CRITICAL — Direct SQL CUD in Services**
+
+Service classes must NEVER contain `INSERT`, `UPDATE`, or `DELETE` query building. These are Table responsibilities accessed through DataModels.
+
+```php
+// ❌ VIOLATION — Service builds INSERT query directly
+class MigrationService
+{
+    public function __construct(
+        private readonly DatabaseInterface $db,  // ❌ CUD via $db
+    ) {}
+
+    public function importItem(array $data): void
+    {
+        $query = $this->db->getQuery(true)
+            ->insert('#__items')
+            ->columns(['title', 'alias', 'state'])
+            ->values(':title, :alias, :state');
+        // Skips Table::check(), Table::applyColumnDefaults(), timestamp tracking
+    }
+}
+
+// ✅ CORRECT — Service delegates to DataModel
+class MigrationService
+{
+    public function __construct(
+        private readonly ItemDataModel $itemDataModel,  // ✅ DataModel injection
+    ) {}
+
+    public function importItem(array $data): void
+    {
+        $this->itemDataModel->createItem($data);
+        // Table handles: defaults, alias, timestamps, validation
+    }
+}
+```
+
+**Detection pattern**: Any Service class with `->insert(`, `->update(`, `->delete(` calls on a query object, or direct `$this->db->execute()` for CUD operations.
+
+**Exception**: Direct SQL is acceptable in Services ONLY for bulk statistical rebuilds (e.g., `rebuildUserCounts()`) where row-by-row Table processing would be prohibitively slow. These must be clearly documented.
+
+#### **CRITICAL — Handcrafted Arrays Bypassing Data Flow**
+
+When source data arrives as `$data` (e.g., from mappers, imports, API input), it should be **enriched** with computed/resolved values and passed through — NOT discarded and rebuilt field-by-field.
+
+```php
+// ❌ VIOLATION — Discards $data, rebuilds manually
+$data = $this->stripTransientFields($mapped);
+$subject = $data['subject'] ?? '';
+$messageBody = $data['message'] ?? '';
+$viewHref = $data['view_href'] ?? '';
+$alias = OutputFilter::stringURLSafe($subject);
+
+$this->messageDataModel->createMessage([
+    'subject'    => $subject,        // extracted from $data
+    'alias'      => $alias,          // manually generated (Table does this)
+    'message'    => $messageBody,    // extracted from $data
+    'state'      => 1,               // hardcoded (Table defaults this)
+    'view_href'  => $viewHref,       // extracted from $data
+    'board_id'   => $boardId,        // resolved value
+    'created'    => $postTime,       // resolved value
+    'created_by' => $userId,         // resolved value
+]);
+// Problems:
+// 1. Tightly couples Service to every column name
+// 2. Duplicates alias generation that Table::check() provides
+// 3. Duplicates state default that Table::applyColumnDefaults() provides
+// 4. Any new column requires changing the Service
+
+// ✅ CORRECT — Enrich $data, pass through
+$data = $this->stripTransientFields($mapped);
+
+// Add only values not already in $data (resolved from mappings, computed)
+$data['board_id']    = $boardId;
+$data['created']     = $postTime;
+$data['created_by']  = $userId;
+
+$this->messageDataModel->createMessage($data);
+// Table handles: alias from subject, state default, timestamp tracking
+// Unknown keys are ignored by Table::store() (only DB columns are written)
+```
+
+**Detection pattern**: Variable extractions from `$data` immediately followed by a new array literal passing those same values to a DataModel/Table method.
+
+#### **IMPORTANT — Table Access in Services**
+
+Services must not instantiate or call Table objects directly. Tables are internal to DataModels.
+
+```php
+// ❌ VIOLATION — Service uses Table directly
+class ItemService
+{
+    public function createItem(array $data): void
+    {
+        $table = $this->mvcFactory->createTable('Item', 'Administrator');
+        $table->bind($data);
+        $table->check();
+        $table->store();
+    }
+}
+
+// ✅ CORRECT — Service delegates to DataModel
+class ItemService
+{
+    public function createItem(array $data): void
+    {
+        $this->itemDataModel->createItem($data);
+        // DataModel handles Table internally
+    }
+}
+```
+
+**Detection pattern**: Any Service class referencing `createTable(`, `MVCFactoryInterface`, or `TableInterface`.
+
+#### **IMPORTANT — DatabaseInterface for CUD in Services**
+
+Services that inject `DatabaseInterface` and use it for CUD operations bypass the Table layer entirely.
+
+```php
+// ❌ VIOLATION — DatabaseInterface used for creates/updates
+public function __construct(
+    private readonly DatabaseInterface $db,
+) {}
+
+// ✅ ACCEPTABLE — DatabaseInterface for read-only aggregate queries
+// (e.g., COUNT, SUM, complex JOINs for statistics/reporting)
+public function __construct(
+    private readonly DatabaseInterface $db,       // OK for reads only
+    private readonly ItemDataModel $itemDataModel, // Required for CUD
+) {}
+```
+
+**Detection pattern**: Service constructor accepting `DatabaseInterface` alongside `->insert(`, `->update(`, or `->delete(` usage in the same class. Read-only usage (`->select(`) is acceptable for aggregates.
+
+### **Automated Detection Searches**
+
+When reviewing a project, use these patterns to find potential violations:
+
+```
+1. Find Services with direct CUD SQL:
+   Grep for ->insert( or ->update( or ->delete( in Service/ directories
+   mcp__serena__search_for_pattern("->insert\(|->update\(|->delete\(")
+   — Filter results to Service classes only
+   — Exclude DataModel classes (they are SUPPOSED to do this)
+   — Exclude bulk rebuild methods (documented exception)
+
+2. Find Services injecting DatabaseInterface:
+   Grep for DatabaseInterface in Service/ constructors
+   mcp__serena__search_for_pattern("DatabaseInterface.*\$db")
+   — Cross-reference with CUD usage in the same file
+   — Read-only usage for aggregates is acceptable
+
+3. Find handcrafted array patterns:
+   Grep for array literals passed to DataModel create/save methods
+   mcp__serena__search_for_pattern("DataModel->create|DataModel->save")
+   — Check if the array is built from variables extracted from another $data array
+   — If source $data exists, it should be enriched and passed through
+
+4. Find Table usage outside DataModels:
+   mcp__serena__search_for_pattern("createTable\(|MVCFactoryInterface")
+   — Should only appear in DataModel classes and provider.php
+   — Should NOT appear in Service classes
+
+5. Find hardcoded column defaults that Tables handle:
+   Grep for state assignments in Services
+   mcp__serena__search_for_pattern("'state'\s*=>\s*(1|PublicationState|MessageState)")
+   — If the Table has applyColumnDefaults(), the Service shouldn't set defaults
+```
+
+### **Data Access Compliance Checklist**
+
+#### **Service Layer**
+- [ ] **No INSERT/UPDATE/DELETE SQL** — Services never build CUD queries
+- [ ] **No Table instantiation** — Services never call `createTable()` or reference `TableInterface`
+- [ ] **DataModel injection** — All CUD operations delegated to injected DataModels
+- [ ] **Pass-through data flow** — Source data enriched and passed through, not discarded and rebuilt
+- [ ] **No schema coupling** — Services don't hardcode column names in array literals for CUD
+- [ ] **No default duplication** — Services don't set values that Tables default (state, alias, timestamps)
+- [ ] **DatabaseInterface justified** — If injected, used only for read-only aggregates (COUNT, SUM, statistics)
+
+#### **DataModel Layer**
+- [ ] **Table-based CUD** — All creates/updates/deletes use Table `bind()`→`check()`→`store()`/`delete()`
+- [ ] **Return Table objects** — CUD methods return the Table instance so callers can read generated IDs/aliases
+- [ ] **No query builder for CUD** — DataModels don't use `$db->getQuery(true)->insert(...)` for single-row CUD
+
+### **Data Access Violation Report Section**
+
+When reporting data access violations, include:
+
+```markdown
+## 🛡️ Data Access Layer Compliance
+
+**Status**: ❌ CRITICAL VIOLATIONS | ⚠️ IMPORTANT VIOLATIONS | ✅ COMPLIANT
+
+### Critical Violations (Pipeline Bypassed)
+1. **Direct SQL INSERT in Service** [Service\MigrationService::importMessages():456]
+   - Builds INSERT query directly instead of calling DataModel
+   - Skips Table::check() validation, alias generation, timestamp tracking
+   - FIX: Call $this->messageDataModel->createMessage($data)
+
+2. **Handcrafted Array Rebuild** [Service\MigrationService::importMessages():468]
+   - Extracts 8 fields from $data then rebuilds new array with same values
+   - Tightly couples Service to database column names
+   - FIX: Enrich $data with resolved values, pass through to DataModel
+
+### Important Violations
+1. **DatabaseInterface used for UPDATE** [Service\ItemService::updateStatus():85]
+   - Direct UPDATE query bypasses Table::check() and timestamp tracking
+   - FIX: Use $this->itemDataModel->save(['id' => $id, 'state' => $state])
+
+### Compliance Summary
+- Services with direct CUD SQL: 2 (should be 0)
+- Services with handcrafted arrays: 3 (should be 0)
+- Services with Table access: 0 ✅
+- DataModels using Table pipeline: 5/5 ✅
+
+**Recommendation**: Refactor Services to delegate all CUD through DataModels
+```
+
+### **Memory Integration for Data Access Validation**
+
+Document data access findings in Serena memories:
+
+```
+1. Write data access validation results:
+   mcp__serena__write_memory("review-{ext}-data-access-compliance", {
+       violations: [...],
+       services_with_direct_sql: [...],
+       handcrafted_arrays: [...],
+       compliance_score: "x/10"
+   })
+
+2. Track remediation:
+   mcp__serena__write_memory("review-{ext}-data-access-debt", {
+       violations_to_fix: [...],
+       priority: "HIGH|MEDIUM|LOW"
+   })
+```
+
+---
+
 ## 📝 **Change Logging Protocol**
 
 ### **MANDATORY: Log All Review Activities**

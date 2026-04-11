@@ -56,12 +56,51 @@
   1. **SQL update file**: `sql/updates/mysql/{V.R.M}.sql`
   2. **Manifest XML**: `<version>` element in `admin/com_{name}/{name}.xml`
   3. **Phing build file**: `version` property in `Phing/com_{name}.xml`
-- **When a schema change is needed**, ASK the user whether to:
-  - **Append** to the current (latest) SQL update file, OR
-  - **Create a new** SQL update file with the next version number
-- Only when a **new** SQL update file is created should the manifest and Phing versions be bumped to match
-- Appending to the current file requires no version changes — this supports iterative development before deployment
-- **When bumping the version**, also review the `<creationDate>` element in the manifest XML and update it to the current month and year (e.g. `<creationDate>March 2026</creationDate>`) if it does not reflect the current date
+- **When bumping the version**, also review the `<creationDate>` element in the manifest XML and update it to the current date (e.g. `<creationDate>yyyy-mm-dd</creationDate>`) if it does not reflect the current date
+
+### SQL Update File Management
+
+SQL update files in `sql/updates/mysql/` are versioned and **immutable once committed to git**. The following rule governs how and when SQL changes are written:
+
+#### The Git-Stage Rule
+
+> **A SQL update file may only be written to if it is unstaged (untracked or modified) in git.**
+> A committed SQL file is considered **sealed** — it belongs to a previous release and must never be modified.
+
+#### Decision Flow — When Writing SQL Changes
+
+Before writing any ALTER TABLE, CREATE TABLE, or other schema SQL:
+
+1. **Check git status** for the SQL updates directory (`sql/updates/mysql/`).
+2. **If an unstaged/untracked `.sql` file exists** — it is the current work-in-progress file. Write the SQL statements into this file.
+3. **If no unstaged `.sql` file exists** — all existing files are committed (sealed). A new file must be created:
+   - Read the highest version number from existing `.sql` filenames in the directory.
+   - Increment **M** (modification) by 1 to calculate the next version (e.g. `2.4.2` → `2.4.3`).
+   - Create the new file `{next-version}.sql` and write the SQL statements into it.
+4. **Do NOT update the manifest XML or Phing build file** at this stage — version synchronisation happens later during the version-bump step.
+
+#### Why This Approach
+
+- **Prevents accidental writes to sealed files** — committed SQL files belong to deployed releases and must not change.
+- **Auto-creates the target file** — agents and developers don't need to manually bump before starting work that includes schema changes.
+- **Multiple SQL changes accumulate** — all schema changes during a development session go into the same unstaged file.
+- **Version-bump reconciles at the end** — the `/version-bump` skill detects the unstaged SQL file and either keeps its name (modification) or renames it (release/version bump) to match the final version, then syncs the manifest and Phing files.
+
+#### Example Workflow
+
+```
+Existing committed files: 2.4.0.sql, 2.4.1.sql, 2.4.2.sql
+
+1. Agent needs to add a column → checks git status → no unstaged .sql files
+   → Creates 2.4.3.sql with ALTER TABLE statement
+
+2. Agent needs another schema change → checks git status → 2.4.3.sql is unstaged
+   → Appends to 2.4.3.sql
+
+3. All code changes complete → user runs /version-bump
+   - If changes are a bugfix → /version-bump modification → 2.4.3.sql stays as-is, manifest + Phing set to 2.4.3
+   - If changes are a feature → /version-bump release → 2.4.3.sql renamed to 2.5.0.sql, manifest + Phing set to 2.5.0
+```
 
 ### Git Commit Message Convention — Conventional Commits
 - All projects MUST use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) syntax
@@ -118,10 +157,29 @@
   </field>
   ```
 
-### Do Not Remove `$query->dump()`
-- `DatabaseQuery::dump()` is marked deprecated since Joomla 3 but **must not be removed** from existing code
-- It is actively used for debugging SQL statements during development
-- Agents and code reviewers must leave existing `dump()` calls in place
+### `setFilterSearch()` Must Be Called Last in Query Building
+- The `setFilterSearch()` method in `LocalTraits` uses `where($conditions, 'OR')` when no prior WHERE clause exists
+- This sets the OR glue for the **entire** WHERE clause, causing all subsequent `->where()` calls to be joined with OR instead of AND
+- When a prior WHERE exists, it correctly uses `extendWhere('AND', $conditions, 'OR')` which groups the search terms in parentheses
+- **Rule**: In any `getListQuery()` method, always call `setFilterSearch()` **after** all other filters (published state, entity, bin, stock, freshness, etc.) so the OR glue does not leak into other conditions
+
+### SQL Debugging with `sqlDump()`
+- The `LocalTraits` trait (in `admin/com_{name}/src/Model/LocalTraits.php`) includes a `sqlDump($query)` method for SQL diagnostics
+- It returns the fully resolved SQL with bound parameter values substituted and table prefix replaced
+- Use `$this->sqlDump($query)` instead of `$query->dump()` for meaningful debug output
+- For quick browser output during debugging: `die($this->sqlDump($products->query));`
+- The method must be present in every project's `LocalTraits`:
+  ```php
+  protected function sqlDump($query) {
+      $sql = $this->db->replacePrefix((string) $query);
+      foreach ($query->bounded as $key => $bound) {
+          $value = is_string($bound->value) ? "'" . $bound->value . "'" : $bound->value;
+          $sql = str_replace($key, $value, $sql);
+      }
+      return $sql;
+  }
+  ```
+- `DatabaseQuery::dump()` is deprecated and only shows placeholders — prefer `sqlDump()` for all SQL diagnostics
 
 ### Database Schema
 - MySQL8+ and MariaDB 10+ support

@@ -42,3 +42,26 @@ Key conventions:
 
 **Development Setup** (Windows):
 Run `symlink.bat` to create junction link for live development in Joomla installation.
+
+### Xdebug Path Mappings for Symlinked Extensions
+
+When extensions are symlinked from a repository into a Joomla instance, Xdebug has **dual path behavior**:
+
+- **Breakpoint matching**: uses the **symlink path** (`E:/www/{domain}/components/com_example/...`)
+- **Breakpoint reporting**: uses the **resolved real path** (`E:/repositories/{repo}/site/com_example/...`)
+
+Each symlinked extension therefore requires **two `remote-root` entries** in PHPStorm's server path mappings (`.idea/workspace.xml` → `<component name="PhpServers">`), both pointing to the same `local-root`:
+
+| local-root (repository source) | remote-root 1 (symlink — for matching) | remote-root 2 (resolved — for reporting) |
+|---|---|---|
+| `{repo}/admin/com_example` | `{domain}/administrator/components/com_example` | `{repo}/admin/com_example` |
+| `{repo}/site/com_example` | `{domain}/components/com_example` | `{repo}/site/com_example` |
+| `{repo}/api/com_example` | `{domain}/api/components/com_example` | `{repo}/api/com_example` |
+| `{repo}/media/com_example` | `{domain}/media/com_example` | `{repo}/media/com_example` |
+| `{repo}/plugins/{group}/{name}` | `{domain}/plugins/{group}/{name}` | `{repo}/plugins/{group}/{name}` |
+
+Joomla core (not symlinked) needs only a single mapping: `remote-root = E:/www/{domain}`.
+
+If two server entries exist (e.g. port 443 and default), both need the same dual mappings.
+
+**Diagnostics**: Enable `xdebug.log = "E:/tmp/xdebug.log"` and `xdebug.log_level = 7` in php.ini. Ensure `E:\tmp` exists. Look for `breakpoint_set` (what PHPStorm sends) and `breakpoint_resolved` (what Xdebug reports back) to verify paths match.

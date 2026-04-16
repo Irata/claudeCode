@@ -8,6 +8,13 @@
 - PHP 8.3+ language features (constructor promotion, readonly properties, enums, match expressions, typed class constants, `#[Override]` attribute)
 - Modern PSR-4 autoloading with Joomla namespaced classes
 - Joomla 4.x/5.x conventions and security practices
+
+### `#[Override]` — Match Parent Method Signatures Exactly
+- When overriding a method with `#[Override]`, the child method signature **MUST exactly match** the parent method's parameter types, default values, and return type
+- **Before writing any override**, read or look up the parent class method to confirm its exact signature — do NOT assume types or add types the parent does not declare
+- Joomla's core classes often omit type declarations (e.g. `$id = null` without `?int`, no return type). The override must match this — adding types the parent lacks causes a PHP `Compile Error`
+- Common pitfall: `Table::_getAssetParentId(?Table $table = null, $id = null)` has **no type on `$id`** and **no return type** — overrides must not add `?int $id` or `: int`
+- This applies to all framework classes (Table, Model, Controller, View, etc.) — always verify before overriding
 - All files include `defined('_JEXEC') or die;` protection
 - Uses container-based dependency injection
 - PHPDoc comments for all public methods and properties

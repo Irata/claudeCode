@@ -788,7 +788,9 @@ Place this immediately before the title link in the title `<td>`.
 - Implement `check()` for validation
 - Implement `store()` overrides for audit fields
 - Use `#[Override]` attribute on overridden methods
+- **Before writing any override, read the parent class method to confirm its exact signature** — parameter types, default values, and return type MUST match exactly. Joomla core often omits type declarations; adding types the parent lacks causes a PHP `Compile Error`. For example, `Table::_getAssetParentId(?Table $table = null, $id = null)` has no type on `$id` and no return type.
 - These are shared between admin and site — place in Administrator namespace
+- For per-item ACL, implement `_getAssetName()`, `_getAssetTitle()`, and `_getAssetParentId()` — matching the parent signatures exactly
 
 ### 7. Forms XML (`forms/`)
 - Define all form fields with proper types, labels, descriptions

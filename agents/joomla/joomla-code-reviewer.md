@@ -485,6 +485,7 @@ During code review, verify each layer follows the pattern:
 - [ ] **Models** contain all validation rules
 - [ ] **Controllers** contain complete CRUD operations
 - [ ] **Controllers** contain ACL checking logic
+- [ ] **`#[Override]` methods** match the parent method signature exactly (parameter types, defaults, return type) — Joomla core often omits type hints; adding types the parent lacks causes a PHP `Compile Error`
 - [ ] **Forms XML** define all fields (admin-visible and public-visible)
 - [ ] **Views** use `$this->getModel()->getItems()` — NOT deprecated `$this->get('Items')` (deprecated 5.3.0, removed 7.0)
 - [ ] **Views** use `$this->getModel()->getItem()` — NOT deprecated `$this->get('Item')`

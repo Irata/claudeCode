@@ -1,0 +1,553 @@
+# {{PROJECT_NAME}} - Joomla 5 Front-End Design Project
+
+## Project Configuration
+
+- **Project Name**: {{PROJECT_NAME}}
+- **Template Name**: {{TEMPLATE_NAME}}
+- **CSS Framework**: {{CSS_FRAMEWORK}} (Bootstrap 5/Tailwind CSS/Custom)
+- **Build Tool**: {{BUILD_TOOL}} (Vite/Webpack/None)
+- **PHP Version**: 8.3+
+- **Joomla Version**: 5.2+
+- **Project Status**: {{PROJECT_STATUS}} (Active/Maintenance/Archived)
+
+## Directory Paths
+
+- **Repository**: `E:\repositories\{{REPO_NAME}}`
+- **PHPStorm Project**: `E:\PHPStorm Project Files\{{PROJECT_NAME}}`
+- **Joomla Instance**: `E:\www\{{DOMAIN}}`
+- **Template Source**: `E:\repositories\{{REPO_NAME}}\templates\{{TEMPLATE_NAME}}`
+- **Template Media**: `E:\repositories\{{REPO_NAME}}\media\templates\site\{{TEMPLATE_NAME}}`
+- **Template Overrides**: `E:\repositories\{{REPO_NAME}}\templates\{{TEMPLATE_NAME}}\html`
+- **Work Log**: `E:\repositories\{{REPO_NAME}}\Files\work-log.md`
+
+## Joomla 5 Template Structure
+
+```
+templates/{{TEMPLATE_NAME}}/
++-- index.php                    # Main template entry point
++-- component.php                # Bare component output (no chrome)
++-- error.php                    # Error page template
++-- offline.php                  # Offline/maintenance page
++-- templateDetails.xml          # Template manifest (params, positions, files)
++-- joomla.asset.json            # Web Asset Manager definitions
++-- css/
+|   +-- template.css             # Compiled/main CSS
+|   +-- custom.css               # User customisation overrides
++-- scss/                        # SCSS source (if applicable)
+|   +-- _variables.scss          # Design tokens / variables
+|   +-- _mixins.scss             # Reusable mixins
+|   +-- _typography.scss         # Type scale and font stacks
+|   +-- _layout.scss             # Grid, containers, spacing
+|   +-- _components.scss         # UI component styles
+|   +-- _utilities.scss          # Helper/utility classes
+|   +-- _overrides.scss          # Joomla/framework overrides
+|   +-- template.scss            # Main entry (imports all partials)
++-- js/
+|   +-- template.js              # Template JavaScript
++-- images/
+|   +-- ...
++-- fonts/
+|   +-- ...
++-- html/                        # Template overrides
+|   +-- com_content/             # Content component overrides
+|   |   +-- article/
+|   |   |   +-- default.php
+|   |   +-- category/
+|   |       +-- default.php
+|   |       +-- blog.php
+|   +-- com_contact/             # Contact overrides
+|   +-- com_users/               # User/login overrides
+|   +-- mod_menu/                # Menu module overrides
+|   +-- mod_breadcrumbs/         # Breadcrumb overrides
+|   +-- mod_search/              # Search overrides
+|   +-- layouts/                 # Layout overrides
+|       +-- joomla/
+|           +-- content/
+|           +-- pagination/
+|           +-- system/
++-- language/
+    +-- en-GB/
+        +-- tpl_{{TEMPLATE_NAME}}.ini
+        +-- tpl_{{TEMPLATE_NAME}}.sys.ini
+```
+
+### Media Directory Layout
+
+```
+media/templates/site/{{TEMPLATE_NAME}}/
++-- joomla.asset.json            # Web Asset definitions (alternative location)
++-- css/
+|   +-- template.css
++-- js/
+|   +-- template.js
++-- images/
++-- fonts/
+```
+
+## Web Asset Manager
+
+All CSS and JS **must** be registered through `joomla.asset.json` and loaded via the Web Asset Manager. Never use raw `<link>` or `<script>` tags in templates.
+
+### Registration (joomla.asset.json)
+
+```json
+{
+  "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
+  "name": "tpl_{{TEMPLATE_NAME}}",
+  "version": "1.0.0",
+  "description": "{{TEMPLATE_NAME}} template assets",
+  "license": "GPL-2.0-or-later",
+  "assets": [
+    {
+      "name": "template.{{TEMPLATE_NAME}}.css",
+      "type": "style",
+      "uri": "templates/{{TEMPLATE_NAME}}/css/template.css",
+      "version": "auto"
+    },
+    {
+      "name": "template.{{TEMPLATE_NAME}}.js",
+      "type": "script",
+      "uri": "templates/{{TEMPLATE_NAME}}/js/template.js",
+      "dependencies": ["jquery"],
+      "attributes": { "defer": true }
+    },
+    {
+      "name": "template.{{TEMPLATE_NAME}}",
+      "type": "preset",
+      "dependencies": [
+        "template.{{TEMPLATE_NAME}}.css",
+        "template.{{TEMPLATE_NAME}}.js"
+      ]
+    }
+  ]
+}
+```
+
+### Usage (index.php)
+
+```php
+$wa = $this->getWebAssetManager();
+$wa->usePreset('template.{{TEMPLATE_NAME}}');
+// Or individually:
+// $wa->useStyle('template.{{TEMPLATE_NAME}}.css');
+// $wa->useScript('template.{{TEMPLATE_NAME}}.js');
+```
+
+### Asset Naming Convention
+
+- Template preset: `template.{{TEMPLATE_NAME}}`
+- Template styles: `template.{{TEMPLATE_NAME}}.css`
+- Template scripts: `template.{{TEMPLATE_NAME}}.js`
+- Page-specific: `template.{{TEMPLATE_NAME}}.{page}.css`
+
+**URI convention**: For assets inside a template directory, use `templates/{{TEMPLATE_NAME}}/css/file.css` (full relative path). For assets in the media directory, use `com_example/file.js` (Joomla prepends `js/`/`css/` automatically — do NOT include those subdirectories in the URI).
+
+## Template Entry Point (index.php)
+
+### Minimal Joomla 5 Template
+
+```php
+<?php
+defined('_JEXEC') or die;
+
+use Joomla\CMS\Document\HtmlDocument;
+use Joomla\CMS\Factory;
+use Joomla\CMS\HTML\HTMLHelper;
+use Joomla\CMS\Uri\Uri;
+
+/** @var HtmlDocument $this */
+
+$app   = Factory::getApplication();
+$wa    = $this->getWebAssetManager();
+$input = $app->getInput();
+
+// Load template assets
+$wa->usePreset('template.{{TEMPLATE_NAME}}');
+
+// Template parameters
+$params = $this->params;
+?>
+<!DOCTYPE html>
+<html lang="<?php echo $this->language; ?>" dir="<?php echo $this->direction; ?>">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <jdoc:include type="metas" />
+    <jdoc:include type="styles" />
+    <jdoc:include type="scripts" />
+</head>
+<body class="<?php echo $this->direction === 'rtl' ? 'rtl' : ''; ?>">
+    <a href="#main-content" class="visually-hidden-focusable">Skip to main content</a>
+
+    <header>
+        <jdoc:include type="modules" name="topbar" style="none" />
+        <nav>
+            <jdoc:include type="modules" name="menu" style="none" />
+        </nav>
+    </header>
+
+    <main id="main-content">
+        <jdoc:include type="modules" name="breadcrumbs" style="none" />
+        <jdoc:include type="message" />
+        <jdoc:include type="component" />
+    </main>
+
+    <aside>
+        <jdoc:include type="modules" name="sidebar" style="card" />
+    </aside>
+
+    <footer>
+        <jdoc:include type="modules" name="footer" style="none" />
+    </footer>
+
+    <jdoc:include type="modules" name="debug" style="none" />
+</body>
+</html>
+```
+
+### Module Positions
+
+Document all module positions and their intended use:
+
+| Position | Location | Typical Content |
+|----------|----------|-----------------|
+| `topbar` | Above header | Top bar / utility nav |
+| `menu` | Header nav area | Main navigation |
+| `breadcrumbs` | Below header | Breadcrumb trail |
+| `sidebar` | Beside content | Sidebar modules |
+| `footer` | Page footer | Footer content |
+| `debug` | After footer | Debug module (dev only) |
+
+## CSS Conventions
+
+### Design Tokens (CSS Custom Properties)
+
+```css
+:root {
+    /* Colour palette */
+    --color-primary: #0d6efd;
+    --color-secondary: #6c757d;
+    --color-accent: #198754;
+    --color-background: #ffffff;
+    --color-surface: #f8f9fa;
+    --color-text: #212529;
+    --color-text-muted: #6c757d;
+
+    /* Typography */
+    --font-family-base: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-family-heading: var(--font-family-base);
+    --font-family-mono: "SFMono-Regular", Menlo, Consolas, monospace;
+    --font-size-base: 1rem;
+    --line-height-base: 1.5;
+
+    /* Spacing scale */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 3rem;
+
+    /* Layout */
+    --container-max-width: 1200px;
+    --sidebar-width: 300px;
+
+    /* Borders */
+    --border-radius: 0.375rem;
+    --border-color: #dee2e6;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+
+    /* Transitions */
+    --transition-speed: 200ms;
+    --transition-ease: ease-in-out;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --color-background: #1a1a2e;
+        --color-surface: #16213e;
+        --color-text: #e0e0e0;
+        --color-text-muted: #9e9e9e;
+        --color-border: #2d3748;
+    }
+}
+```
+
+### Naming Convention
+
+- **BEM** for custom components: `.block__element--modifier`
+- **Utility classes** from framework where available (Bootstrap `d-flex`, `mt-3`, etc.)
+- **State classes**: `.is-active`, `.is-hidden`, `.is-loading`, `.has-error`
+- **JavaScript hooks**: `[data-toggle="..."]`, `[data-action="..."]` — never style JS hooks
+
+### File Organisation
+
+- One SCSS partial per concern (variables, typography, layout, components, overrides)
+- Import order: variables > mixins > base > layout > components > utilities > overrides
+- Joomla/framework CSS overrides go in `_overrides.scss` (not scattered)
+
+## JavaScript Conventions
+
+- Use ES6+ modules where possible
+- Register all scripts through Web Asset Manager
+- Use `defer` attribute for non-critical scripts
+- Prefer `data-*` attributes for JS hooks (not classes)
+- Avoid jQuery unless required by Joomla core; prefer vanilla JS
+- Use `Joomla.Text._()` for translated strings in JS
+- Use `Joomla.getOptions()` for passing PHP data to JS
+
+## Template Override Patterns
+
+### Creating Overrides
+
+1. Copy original file from `components/com_content/tmpl/article/default.php`
+2. Place in `templates/{{TEMPLATE_NAME}}/html/com_content/article/default.php`
+3. Modify the copy — Joomla loads overrides automatically
+
+### Override Best Practices
+
+- **Minimal changes**: Only modify what's necessary; future Joomla updates may change the original
+- **Use `$this->params`** for template-level configuration
+- **Use `HTMLHelper`** for standard output (dates, images, tooltips)
+- **Preserve `$displayData`** variables in layout overrides
+- **Never call `defined('_JEXEC') or die;`** — it's already checked
+- **Comment your changes** so they can be reapplied after Joomla updates
+
+### Layout Overrides
+
+Layouts in `html/layouts/joomla/` override core layouts. Common overrides:
+
+- `joomla/content/info_block.php` — Article info (author, date, hits)
+- `joomla/content/tags.php` — Tag display
+- `joomla/pagination/default.php` — Pagination controls
+- `joomla/system/message.php` — System messages
+
+## Accessibility (WCAG 2.1 AA)
+
+### Requirements
+
+- **Semantic HTML**: Use `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, `<section>`, `<article>`
+- **Landmarks**: All content within ARIA landmark regions
+- **Headings**: Logical heading hierarchy (`h1` > `h2` > `h3`), single `<h1>` per page
+- **Skip link**: "Skip to main content" as first focusable element
+- **Keyboard**: All interactive elements reachable and operable via keyboard
+- **Focus indicators**: Visible focus styles on all interactive elements (never `outline: none` without replacement)
+- **Colour contrast**: 4.5:1 for body text, 3:1 for large text (18px+ bold or 24px+)
+- **Motion**: Respect `prefers-reduced-motion` — disable animations/transitions
+- **Images**: Meaningful `alt` text; decorative images use `alt=""`
+- **Forms**: Labels associated with inputs; error messages linked via `aria-describedby`
+- **Links**: Descriptive link text (never "click here")
+
+### Testing Tools
+
+- axe DevTools browser extension
+- WAVE Web Accessibility Evaluator
+- Lighthouse accessibility audit
+- Manual keyboard-only navigation testing
+
+## Responsive Design
+
+### Breakpoints
+
+Use the CSS framework's breakpoint system. For Bootstrap 5:
+
+| Breakpoint | Min-width | Target |
+|------------|-----------|--------|
+| `xs` | 0 | Phones (portrait) |
+| `sm` | 576px | Phones (landscape) |
+| `md` | 768px | Tablets |
+| `lg` | 992px | Desktops |
+| `xl` | 1200px | Large desktops |
+| `xxl` | 1400px | Extra large |
+
+### Approach
+
+- **Mobile-first**: Base styles for mobile, `min-width` media queries for larger screens
+- **Fluid typography**: `clamp()` for responsive font sizes
+- **Flexible images**: `max-width: 100%; height: auto;`
+- **Container queries**: Use where supported for component-level responsiveness
+- **Touch targets**: Minimum 44x44px for interactive elements on mobile
+
+## Template Parameters (templateDetails.xml)
+
+Template parameters are defined in `templateDetails.xml` and accessed via `$this->params`:
+
+```xml
+<config>
+    <fields name="params">
+        <fieldset name="basic" label="TPL_{{TEMPLATE_NAME}}_BASIC">
+            <field name="logoFile" type="media" label="TPL_{{TEMPLATE_NAME}}_LOGO" />
+            <field name="siteDescription" type="text" label="TPL_{{TEMPLATE_NAME}}_TAGLINE" />
+            <field name="colorScheme" type="list" default="light" label="TPL_{{TEMPLATE_NAME}}_COLOR_SCHEME">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="auto">Auto (System)</option>
+            </field>
+        </fieldset>
+        <fieldset name="typography" label="TPL_{{TEMPLATE_NAME}}_TYPOGRAPHY">
+            <field name="fontFamily" type="list" default="system" label="TPL_{{TEMPLATE_NAME}}_FONT">
+                <option value="system">System Default</option>
+                <option value="inter">Inter</option>
+                <option value="roboto">Roboto</option>
+            </field>
+        </fieldset>
+        <fieldset name="layout" label="TPL_{{TEMPLATE_NAME}}_LAYOUT">
+            <field name="containerWidth" type="list" default="1200" label="TPL_{{TEMPLATE_NAME}}_CONTAINER_WIDTH">
+                <option value="960">Narrow (960px)</option>
+                <option value="1200">Standard (1200px)</option>
+                <option value="1400">Wide (1400px)</option>
+            </field>
+            <field name="sidebarPosition" type="list" default="right" label="TPL_{{TEMPLATE_NAME}}_SIDEBAR">
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+                <option value="none">None</option>
+            </field>
+        </fieldset>
+    </fields>
+</config>
+```
+
+### Accessing Parameters
+
+```php
+// In index.php or override files
+$logo         = $this->params->get('logoFile', '');
+$colorScheme  = $this->params->get('colorScheme', 'light');
+$containerMax = $this->params->get('containerWidth', '1200');
+$sidebar      = $this->params->get('sidebarPosition', 'right');
+```
+
+## Browser Support
+
+- Chrome/Edge (last 2 versions)
+- Firefox (last 2 versions)
+- Safari (last 2 versions)
+- iOS Safari (last 2 versions)
+- Samsung Internet (last 2 versions)
+
+## Performance Guidelines
+
+- **Critical CSS**: Inline above-the-fold styles or use `media` attribute for non-critical sheets
+- **Image optimisation**: Use WebP/AVIF with `<picture>` fallbacks; lazy-load below-fold images
+- **Font loading**: `font-display: swap`; preload critical fonts; limit font weights/variants
+- **Asset loading**: Use `defer`/`async` for scripts; combine where sensible via Web Asset Manager
+- **Minimise DOM depth**: Avoid deeply nested wrappers
+- **Target metrics**: LCP < 2.5s, FID < 100ms, CLS < 0.1
+
+## Context7 Libraries
+
+For enhanced development context, the following libraries are available in Context7:
+
+@includes/context7.json
+
+Additional libraries:
+- **Bootstrap 5** — CSS framework (`/twbs/bootstrap`)
+- **Tailwind CSS** — Utility-first CSS framework (`/tailwindlabs/tailwindcss`)
+
+## Skills (Shared)
+
+Skills are symlinked from `E:\repositories\ClaudeCode\skills\` into each project's `.claude\skills\` directory via `create_skill_symlinks.bat`. They are project-agnostic and shared across all projects.
+
+@includes/available-skills.md
+
+## Quick Start Checklist
+
+- [ ] Clone repository to `E:\repositories\{{REPO_NAME}}`
+- [ ] Create PHPStorm project at `E:\PHPStorm Project Files\{{PROJECT_NAME}}`
+- [ ] Run `E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat` to link shared skills
+- [ ] Set up Joomla development instance at `E:\www\{{DOMAIN}}`
+- [ ] Create template directory: `templates/{{TEMPLATE_NAME}}/`
+- [ ] Create `templateDetails.xml` manifest
+- [ ] Create `joomla.asset.json` for Web Asset Manager
+- [ ] Create `index.php` entry point
+- [ ] Set up SCSS build pipeline (if using SCSS)
+- [ ] Discover template in Joomla admin: System > Templates > Site Templates
+- [ ] Set as default template
+- [ ] Create `.claude/style-guide.md` documenting design tokens
+- [ ] Create `.claude/design-decisions.md` for design rationale
+
+## Common Development Tasks
+
+### Starting a New Template
+
+```
+1. Create this CLAUDE.md from the template
+2. Update {{placeholders}} with project-specific values
+3. Create templateDetails.xml with positions and parameters
+4. Create joomla.asset.json for asset registration
+5. Create index.php entry point
+6. Set up SCSS partials (if using SCSS)
+7. Discover and activate in Joomla admin
+```
+
+### Adding a Template Override
+
+```
+1. Identify the original file in components/com_*/tmpl/ or modules/mod_*/tmpl/
+2. Copy to templates/{{TEMPLATE_NAME}}/html/com_*/view/file.php
+3. Modify the copy — Joomla loads overrides automatically
+4. Test across all relevant content items
+```
+
+### Adding a Module Position
+
+```
+1. Add <position> to templateDetails.xml
+2. Add <jdoc:include type="modules" name="position-name" /> to index.php
+3. Wrap in conditional: <?php if ($this->countModules('position-name')): ?>
+```
+
+### Setting Up SCSS Build
+
+```
+1. Create scss/ directory with partials
+2. Configure build tool (Vite/Webpack/sass CLI)
+3. Output compiled CSS to css/template.css
+4. Add watch command for development
+```
+
+### Creating a Child Template
+
+```
+1. Create new directory: templates/{{TEMPLATE_NAME}}_child/
+2. Inherit from parent in templateDetails.xml: <inheritable>1</inheritable>
+3. Override only the files you need to change
+4. Child template overrides take precedence over parent
+```
+
+### Debugging Template Issues
+
+```
+1. Enable Joomla debug mode: Global Configuration > System > Debug
+2. Check template position assignments: Extensions > Modules
+3. Preview module positions: ?tp=1 URL parameter
+4. Check browser dev tools for CSS specificity conflicts
+5. Check Joomla error log: E:\www\{{DOMAIN}}/error.log
+```
+
+## Documentation References
+
+**Project-Specific** (in this project):
+- `.claude/style-guide.md` — Design tokens, colour palette, typography
+- `.claude/design-decisions.md` — Design rationale and pattern library
+
+**Official Documentation**:
+- [Joomla Template Development](https://docs.joomla.org/J4.x:Creating_a_Simple_Module/Developing_a_Basic_Module)
+- [Joomla Web Asset Manager](https://manual.joomla.org/docs/general-concepts/web-asset-manager/)
+- [Joomla Template Overrides](https://docs.joomla.org/Layout_Overrides_in_Joomla)
+- [Bootstrap 5 Documentation](https://getbootstrap.com/docs/5.3/)
+- [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
+
+## Change Logging
+
+All development activities are logged to: `E:\repositories\{{REPO_NAME}}\Files\work-log.md`
+
+---
+
+**Project Created**: {{CREATION_DATE}}
+**Maintained By**: {{MAINTAINER_NAME}}
+**Last Updated**: {{LAST_UPDATED}}
+**Status**: {{PROJECT_STATUS}}

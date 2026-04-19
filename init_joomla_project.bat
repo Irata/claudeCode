@@ -62,6 +62,7 @@ set CLAUDE_DIR=%PROJECT_DIR%\.claude
 set TEMPLATE=E:\repositories\ClaudeCode\templates\CLAUDE.md.joomla-template
 set AGENTS_SCRIPT=E:\repositories\ClaudeCode\agents\create_agent_symlinks.bat
 set INCLUDES_SCRIPT=E:\repositories\ClaudeCode\includes\create_include_symlinks.bat
+set SKILLS_SCRIPT=E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat
 
 echo.
 echo ============================================
@@ -85,7 +86,7 @@ if /i not "%CONFIRM%"=="Y" (
 
 REM --- Step 1: Create project directory structure ---
 echo.
-echo [1/8] Creating project directory structure...
+echo [1/10] Creating project directory structure...
 
 if not exist "%PROJECT_DIR%" (
     mkdir "%PROJECT_DIR%"
@@ -106,7 +107,7 @@ if not exist "%CLAUDE_DIR%" (
 
 REM --- Step 2: Create CLAUDE.md from template ---
 echo.
-echo [2/8] Generating CLAUDE.md from template...
+echo [2/10] Generating CLAUDE.md from template...
 
 if not exist "%TEMPLATE%" (
     echo Error: Template not found at %TEMPLATE%
@@ -149,7 +150,7 @@ echo   Generated: %PROJECT_DIR%\CLAUDE.md
 
 REM --- Step 3: Create .claude documentation stubs ---
 echo.
-echo [3/8] Creating .claude documentation files...
+echo [3/10] Creating .claude documentation files...
 
 REM Create project-ecosystem.md stub
 set "ECOSYSTEM_FILE=%CLAUDE_DIR%\project-ecosystem.md"
@@ -319,7 +320,7 @@ if not exist "!ARCH_FILE!" (
 
 REM --- Step 4: Run agent symlinks ---
 echo.
-echo [4/8] Creating agent symlinks...
+echo [4/10] Creating agent symlinks...
 echo   (You will be prompted for each agent)
 echo.
 
@@ -328,15 +329,23 @@ echo !PROJECT_NAME!| call "%AGENTS_SCRIPT%"
 
 REM --- Step 5: Run include symlinks ---
 echo.
-echo [5/8] Creating include symlinks...
+echo [5/10] Creating include symlinks...
 echo   (You will be prompted for each include)
 echo.
 
 echo !PROJECT_NAME!| call "%INCLUDES_SCRIPT%"
 
-REM --- Step 6: Symlink symlink.bat into repository ---
+REM --- Step 6: Run skill symlinks ---
 echo.
-echo [6/8] Linking symlink.bat into repository...
+echo [6/10] Creating skill symlinks...
+echo   (You will be prompted for each skill)
+echo.
+
+echo !PROJECT_NAME!| call "%SKILLS_SCRIPT%"
+
+REM --- Step 7: Symlink symlink.bat into repository ---
+echo.
+echo [7/10] Linking symlink.bat into repository...
 
 set "SYMLINK_SOURCE=E:\repositories\ClaudeCode\symlink.bat"
 set "SYMLINK_DEST=E:\repositories\!REPO_NAME!\symlink.bat"
@@ -350,9 +359,9 @@ if not exist "%SYMLINK_SOURCE%" (
     echo   Linked: !SYMLINK_DEST! -^> %SYMLINK_SOURCE%
 )
 
-REM --- Step 7: Copy Phing build templates ---
+REM --- Step 8: Copy Phing build templates ---
 echo.
-echo [7/8] Copying Phing build templates...
+echo [8/10] Copying Phing build templates...
 
 set "PHING_TEMPLATE_DIR=E:\repositories\ClaudeCode\templates\Phing"
 set "PHING_DEST_DIR=E:\repositories\!REPO_NAME!\Phing"
@@ -371,7 +380,35 @@ for %%F in ("!PHING_TEMPLATE_DIR!\*.xml") do (
     )
 )
 
-REM --- Step 8: Summary ---
+REM --- Step 9: Symlink utility scripts into project directory ---
+echo.
+echo [9/10] Linking utility scripts into project directory...
+
+REM init_joomla_project.bat
+if exist "%PROJECT_DIR%\init_joomla_project.bat" (
+    echo   Exists: init_joomla_project.bat
+) else (
+    mklink "%PROJECT_DIR%\init_joomla_project.bat" "E:\repositories\ClaudeCode\init_joomla_project.bat" >nul
+    echo   Linked: init_joomla_project.bat
+)
+
+REM symlink.bat
+if exist "%PROJECT_DIR%\symlink.bat" (
+    echo   Exists: symlink.bat
+) else (
+    mklink "%PROJECT_DIR%\symlink.bat" "E:\repositories\ClaudeCode\symlink.bat" >nul
+    echo   Linked: symlink.bat
+)
+
+REM create_skill_symlinks.bat
+if exist "%PROJECT_DIR%\create_skill_symlinks.bat" (
+    echo   Exists: create_skill_symlinks.bat
+) else (
+    mklink "%PROJECT_DIR%\create_skill_symlinks.bat" "E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat" >nul
+    echo   Linked: create_skill_symlinks.bat
+)
+
+REM --- Step 10: Summary ---
 echo.
 echo ============================================
 echo   Project Initialization Complete
@@ -383,9 +420,15 @@ echo   .claude\project-ecosystem.md (update with your services)
 echo   .claude\architecture.md      (update with your design)
 echo   Agents: %CLAUDE_DIR%\agents\
 echo   Includes: %CLAUDE_DIR%\includes\
+echo   Skills: %CLAUDE_DIR%\skills\
 echo.
 echo   Symlink: E:\repositories\!REPO_NAME!\symlink.bat -^> ClaudeCode\symlink.bat
 echo   Phing:   E:\repositories\!REPO_NAME!\Phing\
+echo.
+echo   Utility scripts in project directory:
+echo     init_joomla_project.bat -^> ClaudeCode\init_joomla_project.bat
+echo     symlink.bat             -^> ClaudeCode\symlink.bat
+echo     create_skill_symlinks.bat -^> ClaudeCode\skills\create_skill_symlinks.bat
 echo.
 echo   Next steps:
 echo   1. Open project in PHPStorm

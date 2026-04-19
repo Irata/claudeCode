@@ -25,7 +25,7 @@ E:\repositories\ClaudeCode\init_joomla_project.bat
 This will:
 - Prompt for project details (name, extension type, vendor, DB connection)
 - Create the PHPStorm project directory
-- Symlink all agents and includes
+- Symlink all agents, includes, and skills
 - Generate a customized CLAUDE.md from the template
 
 #### Option 2: Manual Setup
@@ -46,6 +46,12 @@ This will:
    ```cmd
    cd E:\repositories\ClaudeCode\includes
    create_include_symlinks.bat
+   ```
+
+4. Symlink skills:
+   ```cmd
+   cd E:\repositories\ClaudeCode\skills
+   create_skill_symlinks.bat
    ```
 
 4. Copy and customize CLAUDE.md:

@@ -60,19 +60,27 @@ echo   Source: %SOURCE_DIR%
 echo   Target: %TARGET_DIR%
 echo.
 
-REM Process each skill subdirectory (skip .bat files in the root)
+REM Recursively discover all SKILL.md files (supports nested directories like joomla/)
+REM Source may be nested (e.g. skills/joomla/version-bump/) but target is always flat
+REM because Claude Code only discovers skills at the root of .claude/skills/
+REM   skills/work-log/SKILL.md            -> .claude/skills/work-log/
+REM   skills/joomla/version-bump/SKILL.md  -> .claude/skills/version-bump/
 set LINK_COUNT=0
-for /d %%D in ("%SOURCE_DIR%\*") do (
-    set SKILL_NAME=%%~nxD
-    set SOURCE_SKILL=%%D
-    set TARGET_SKILL=%TARGET_DIR%\!SKILL_NAME!
+for /r "%SOURCE_DIR%" %%F in (SKILL.md) do (
+    if exist "%%F" (
+        REM Get the skill's parent directory (full absolute path, trailing backslash removed)
+        set SOURCE_SKILL=%%~dpF
+        set SOURCE_SKILL=!SOURCE_SKILL:~0,-1!
 
-    REM Check if SKILL.md exists in the source
-    if exist "!SOURCE_SKILL!\SKILL.md" (
+        REM Extract skill name (last path component only — target is flat)
+        for %%N in ("!SOURCE_SKILL!") do set SKILL_NAME=%%~nxN
+        set TARGET_SKILL=%TARGET_DIR%\!SKILL_NAME!
+
         if exist "!TARGET_SKILL!" (
             echo Link already exists for !SKILL_NAME! - skipping
         ) else (
             echo ---
+            echo Source: !SOURCE_SKILL!
             set /p CONFIRM="Create link for skill '!SKILL_NAME!'? (Y/N): "
             if /i "!CONFIRM!"=="Y" (
                 echo Creating junction: !SKILL_NAME!

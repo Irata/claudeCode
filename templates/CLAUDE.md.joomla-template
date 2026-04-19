@@ -200,35 +200,13 @@ Agents share context via Serena memory files. Convention:
 
 ### Available Agents
 
-| Agent | Role | Use When |
-|-------|------|----------|
-| `joomla-orchestrator` | Primary coordinator | Building complete extension workflows |
-| `joomla-architect` | Design/architecture | Starting new extension or major refactor |
-| `joomla-prd-writer` | Requirements documentation | Complex features or new projects |
-| `joomla-admin-builder` | Administrator component | Building admin UI, forms, models |
-| `joomla-site-builder` | Site/frontend component | Building public-facing UI |
-| `joomla-api-builder` | REST API | Creating Web Services endpoints |
-| `joomla-cli-builder` | CLI commands | Creating console commands |
-| `joomla-module-builder` | Modules | Building site/admin modules |
-| `joomla-plugin-builder` | Plugins | Creating plugins (any group) |
-| `joomla-code-reviewer` | Code quality | After implementation, before merge |
-| `joomla-debugger` | Bug diagnosis | When investigating issues |
-| `joomla-test-engineer` | Testing | Creating PHPUnit tests |
-| `joomla-language-manager` | i18n/l10n | Managing translation files |
-| `joomla-migration-agent` | J4→J5 migration | Upgrading from Joomla 4 |
-| `joomla-build-agent` | Phing builds | Creating deployment packages |
-| `joomla-security-auditor` | Security analysis | Security review before release |
-| `joomla-performance-agent` | Performance | Analyzing slow queries/assets |
-| `data-model-architect` | Database schema | Designing database structure |
+@includes/available-agents.md
 
 ## Skills (Shared)
 
 Skills are symlinked from `E:\repositories\ClaudeCode\skills\` into each project's `.claude\skills\` directory via `create_skill_symlinks.bat`. They are project-agnostic and shared across all projects.
 
-| Skill | Purpose | Example |
-|-------|---------|---------|
-| `/version-bump` | Bump V.R.M version across manifest, Phing, and SQL files | `/version-bump modification` |
-| `/work-log` | Scan repository for changes and append daily entries to work log | `/work-log include today` |
+@includes/available-skills.md
 
 ## Serena Memory Conventions
 

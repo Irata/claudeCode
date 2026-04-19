@@ -19,6 +19,17 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+REM --- Load configuration ---
+set "CLAUDECODE_DIR=%~dp0"
+set "CLAUDECODE_DIR=!CLAUDECODE_DIR:~0,-1!"
+if exist "!CLAUDECODE_DIR!\config.bat" (
+    call "!CLAUDECODE_DIR!\config.bat"
+) else (
+    echo Error: config.bat not found. Copy config.bat.example to config.bat and edit it.
+    pause
+    exit /b 1
+)
+
 echo.
 echo ============================================
 echo   Joomla 5 Project Initialization
@@ -27,42 +38,59 @@ echo.
 
 REM --- Gather project information ---
 
-set /p PROJECT_NAME="PHPStorm Project Name: "
+echo This script creates a new PHPStorm project with Claude Code support
+echo for Joomla 5 extension development. You will be prompted for details.
+echo.
+
+set /p PROJECT_NAME="PHPStorm Project Name (creates %PROJECTS_DIR%\<name>): "
 if "%PROJECT_NAME%"=="" (
     echo Error: Project name cannot be empty.
     pause
     exit /b 1
 )
 
-set /p VENDOR_NS="Vendor Namespace (e.g., 'Acme'): "
+echo.
+echo The vendor namespace is the top-level PHP namespace for your extensions.
+echo It appears in class declarations: namespace Acme\Component\MyExt\...
+set /p VENDOR_NS="Vendor Namespace (e.g., 'Acme', 'MyCompany'): "
 if "%VENDOR_NS%"=="" (
     echo Error: Vendor namespace cannot be empty.
     pause
     exit /b 1
 )
 
-set /p REPO_NAME="Repository folder name (under E:\repositories\) [%PROJECT_NAME%]: "
+echo.
+echo The repository folder holds your extension source code under %REPOS_DIR%\.
+echo Press Enter to use the project name as the folder name.
+set /p REPO_NAME="Repository folder name [%PROJECT_NAME%]: "
 if "!REPO_NAME!"=="" (
     set REPO_NAME=%PROJECT_NAME%
 )
 
-set /p DOMAIN="Joomla domain (e.g., 'mysite') [%PROJECT_NAME%]: "
+echo.
+echo The Joomla domain is the folder name under %JOOMLA_DIR%\ where your Joomla
+echo instance is installed (e.g., 'mysite' for %JOOMLA_DIR%\mysite).
+echo Press Enter to use the project name.
+set /p DOMAIN="Joomla domain [%PROJECT_NAME%]: "
 if "!DOMAIN!"=="" (
     set DOMAIN=%PROJECT_NAME%
 )
 
+echo.
+echo The database connection name is used in CLAUDE.md for xdebug and
+echo database tooling references. Press Enter for the default.
 set /p DB_CONN="Database connection name [%PROJECT_NAME%_dev]: "
 if "!DB_CONN!"=="" (
     set DB_CONN=%PROJECT_NAME%_dev
 )
 
 REM --- Define paths ---
-set PROJECT_DIR=E:\PHPStorm Project Files\%PROJECT_NAME%
+set PROJECT_DIR=%PROJECTS_DIR%\%PROJECT_NAME%
 set CLAUDE_DIR=%PROJECT_DIR%\.claude
-set TEMPLATE=E:\repositories\ClaudeCode\templates\CLAUDE.md.joomla-template
-set AGENTS_SCRIPT=E:\repositories\ClaudeCode\agents\create_agent_symlinks.bat
-set INCLUDES_SCRIPT=E:\repositories\ClaudeCode\includes\create_include_symlinks.bat
-set SKILLS_SCRIPT=E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat
+set TEMPLATE=%CLAUDECODE_DIR%\templates\CLAUDE.md.joomla-template
+set AGENTS_SCRIPT=%CLAUDECODE_DIR%\agents\create_agent_symlinks.bat
+set INCLUDES_SCRIPT=%CLAUDECODE_DIR%\includes\create_include_symlinks.bat
+set SKILLS_SCRIPT=%CLAUDECODE_DIR%\skills\create_skill_symlinks.bat
 
 echo.
 echo ============================================
@@ -70,7 +98,7 @@ echo   Configuration Summary
 echo ============================================
 echo   Project:     %PROJECT_NAME%
 echo   Vendor:      !VENDOR_NS!
-echo   Repository:  E:\repositories\!REPO_NAME!
+echo   Repository:  %REPOS_DIR%\!REPO_NAME!
 echo   Domain:      !DOMAIN!
 echo   DB Conn:     !DB_CONN!
 echo   Project Dir: %PROJECT_DIR%
@@ -347,8 +375,8 @@ REM --- Step 7: Symlink symlink.bat into repository ---
 echo.
 echo [7/10] Linking symlink.bat into repository...
 
-set "SYMLINK_SOURCE=E:\repositories\ClaudeCode\symlink.bat"
-set "SYMLINK_DEST=E:\repositories\!REPO_NAME!\symlink.bat"
+set "SYMLINK_SOURCE=%CLAUDECODE_DIR%\symlink.bat"
+set "SYMLINK_DEST=%REPOS_DIR%\!REPO_NAME!\symlink.bat"
 
 if not exist "%SYMLINK_SOURCE%" (
     echo   Warning: Source not found at %SYMLINK_SOURCE% - skipping.
@@ -363,8 +391,8 @@ REM --- Step 8: Copy Phing build templates ---
 echo.
 echo [8/10] Copying Phing build templates...
 
-set "PHING_TEMPLATE_DIR=E:\repositories\ClaudeCode\templates\Phing"
-set "PHING_DEST_DIR=E:\repositories\!REPO_NAME!\Phing"
+set "PHING_TEMPLATE_DIR=%CLAUDECODE_DIR%\templates\Phing"
+set "PHING_DEST_DIR=%REPOS_DIR%\!REPO_NAME!\Phing"
 
 if not exist "!PHING_DEST_DIR!" (
     mkdir "!PHING_DEST_DIR!"
@@ -388,7 +416,7 @@ REM init_joomla_project.bat
 if exist "%PROJECT_DIR%\init_joomla_project.bat" (
     echo   Exists: init_joomla_project.bat
 ) else (
-    mklink "%PROJECT_DIR%\init_joomla_project.bat" "E:\repositories\ClaudeCode\init_joomla_project.bat" >nul
+    mklink "%PROJECT_DIR%\init_joomla_project.bat" "%CLAUDECODE_DIR%\init_joomla_project.bat" >nul
     echo   Linked: init_joomla_project.bat
 )
 
@@ -396,7 +424,7 @@ REM symlink.bat
 if exist "%PROJECT_DIR%\symlink.bat" (
     echo   Exists: symlink.bat
 ) else (
-    mklink "%PROJECT_DIR%\symlink.bat" "E:\repositories\ClaudeCode\symlink.bat" >nul
+    mklink "%PROJECT_DIR%\symlink.bat" "%CLAUDECODE_DIR%\symlink.bat" >nul
     echo   Linked: symlink.bat
 )
 
@@ -404,7 +432,7 @@ REM create_skill_symlinks.bat
 if exist "%PROJECT_DIR%\create_skill_symlinks.bat" (
     echo   Exists: create_skill_symlinks.bat
 ) else (
-    mklink "%PROJECT_DIR%\create_skill_symlinks.bat" "E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat" >nul
+    mklink "%PROJECT_DIR%\create_skill_symlinks.bat" "%CLAUDECODE_DIR%\skills\create_skill_symlinks.bat" >nul
     echo   Linked: create_skill_symlinks.bat
 )
 
@@ -422,8 +450,8 @@ echo   Agents: %CLAUDE_DIR%\agents\
 echo   Includes: %CLAUDE_DIR%\includes\
 echo   Skills: %CLAUDE_DIR%\skills\
 echo.
-echo   Symlink: E:\repositories\!REPO_NAME!\symlink.bat -^> ClaudeCode\symlink.bat
-echo   Phing:   E:\repositories\!REPO_NAME!\Phing\
+echo   Symlink: %REPOS_DIR%\!REPO_NAME!\symlink.bat -^> ClaudeCode\symlink.bat
+echo   Phing:   %REPOS_DIR%\!REPO_NAME!\Phing\
 echo.
 echo   Utility scripts in project directory:
 echo     init_joomla_project.bat -^> ClaudeCode\init_joomla_project.bat

@@ -22,6 +22,17 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+REM --- Load configuration ---
+set "CLAUDECODE_DIR=%~dp0"
+set "CLAUDECODE_DIR=!CLAUDECODE_DIR:~0,-1!"
+if exist "!CLAUDECODE_DIR!\config.bat" (
+    call "!CLAUDECODE_DIR!\config.bat"
+) else (
+    echo Error: config.bat not found. Copy config.bat.example to config.bat and edit it.
+    pause
+    exit /b 1
+)
+
 echo.
 echo ============================================
 echo   Joomla Development Symlink Creator
@@ -29,14 +40,14 @@ echo ============================================
 echo.
 
 REM --- Gather information ---
-set /p REPO_NAME="Repository folder name (under E:\repositories\): "
+set /p REPO_NAME="Repository folder name (under %REPOS_DIR%\): "
 if "%REPO_NAME%"=="" (
     echo Error: Repository name cannot be empty.
     pause
     exit /b 1
 )
 
-set "REPO_DIR=E:\repositories\%REPO_NAME%"
+set "REPO_DIR=%REPOS_DIR%\%REPO_NAME%"
 if not exist "%REPO_DIR%" (
     echo Error: Repository not found at %REPO_DIR%
     pause
@@ -53,23 +64,23 @@ if not "%EXT_SUBDIR%"=="" (
     )
 )
 
-set /p DOMAIN="Joomla instance folder name (under E:\www\): "
+set /p DOMAIN="Joomla instance folder name (under %JOOMLA_DIR%\): "
 if "%DOMAIN%"=="" (
     echo Error: Domain name cannot be empty.
     pause
     exit /b 1
 )
 
-set "JOOMLA_DIR=E:\www\%DOMAIN%"
-if not exist "%JOOMLA_DIR%" (
-    echo Error: Joomla installation not found at %JOOMLA_DIR%
+set "JOOMLA_INSTANCE=%JOOMLA_DIR%\%DOMAIN%"
+if not exist "%JOOMLA_INSTANCE%" (
+    echo Error: Joomla installation not found at %JOOMLA_INSTANCE%
     pause
     exit /b 1
 )
 
 echo.
 echo   Repository: %REPO_DIR%
-echo   Joomla:     %JOOMLA_DIR%
+echo   Joomla:     %JOOMLA_INSTANCE%
 echo.
 
 set LINK_COUNT=0
@@ -82,7 +93,7 @@ REM --- admin/com_* -> administrator/components/com_* ---
 if exist "%REPO_DIR%\admin\" (
     for /d %%C in ("%REPO_DIR%\admin\com_*") do (
         set "COMP_NAME=%%~nxC"
-        set "TARGET=%JOOMLA_DIR%\administrator\components\!COMP_NAME!"
+        set "TARGET=%JOOMLA_INSTANCE%\administrator\components\!COMP_NAME!"
         if exist "!TARGET!" (
             echo   SKIP: admin\!COMP_NAME! ^(already exists^)
         ) else (
@@ -97,7 +108,7 @@ REM --- site/com_* -> components/com_* ---
 if exist "%REPO_DIR%\site\" (
     for /d %%C in ("%REPO_DIR%\site\com_*") do (
         set "COMP_NAME=%%~nxC"
-        set "TARGET=%JOOMLA_DIR%\components\!COMP_NAME!"
+        set "TARGET=%JOOMLA_INSTANCE%\components\!COMP_NAME!"
         if exist "!TARGET!" (
             echo   SKIP: site\!COMP_NAME! ^(already exists^)
         ) else (
@@ -110,12 +121,12 @@ if exist "%REPO_DIR%\site\" (
 
 REM --- api/com_* -> api/components/com_* ---
 if exist "%REPO_DIR%\api\" (
-    if not exist "%JOOMLA_DIR%\api\components" (
-        mkdir "%JOOMLA_DIR%\api\components"
+    if not exist "%JOOMLA_INSTANCE%\api\components" (
+        mkdir "%JOOMLA_INSTANCE%\api\components"
     )
     for /d %%C in ("%REPO_DIR%\api\com_*") do (
         set "COMP_NAME=%%~nxC"
-        set "TARGET=%JOOMLA_DIR%\api\components\!COMP_NAME!"
+        set "TARGET=%JOOMLA_INSTANCE%\api\components\!COMP_NAME!"
         if exist "!TARGET!" (
             echo   SKIP: api\!COMP_NAME! ^(already exists^)
         ) else (
@@ -130,7 +141,7 @@ REM --- media/com_* -> media/com_* ---
 if exist "%REPO_DIR%\media\" (
     for /d %%C in ("%REPO_DIR%\media\com_*") do (
         set "COMP_NAME=%%~nxC"
-        set "TARGET=%JOOMLA_DIR%\media\!COMP_NAME!"
+        set "TARGET=%JOOMLA_INSTANCE%\media\!COMP_NAME!"
         if exist "!TARGET!" (
             echo   SKIP: media\!COMP_NAME! ^(already exists^)
         ) else (
@@ -161,7 +172,7 @@ if exist "%REPO_DIR%\plugins\" (
 
         if "!IS_PLUGIN!"=="1" (
             REM Single-level: plugins/{name} is a plugin directly
-            set "TARGET=%JOOMLA_DIR%\plugins\!GROUP_NAME!"
+            set "TARGET=%JOOMLA_INSTANCE%\plugins\!GROUP_NAME!"
             if exist "!TARGET!" (
                 echo   SKIP: plugins\!GROUP_NAME! ^(already exists^)
             ) else (
@@ -181,10 +192,10 @@ if exist "%REPO_DIR%\plugins\" (
                 )
 
                 if "!IS_SUB_PLUGIN!"=="1" (
-                    if not exist "%JOOMLA_DIR%\plugins\!GROUP_NAME!" (
-                        mkdir "%JOOMLA_DIR%\plugins\!GROUP_NAME!"
+                    if not exist "%JOOMLA_INSTANCE%\plugins\!GROUP_NAME!" (
+                        mkdir "%JOOMLA_INSTANCE%\plugins\!GROUP_NAME!"
                     )
-                    set "TARGET=%JOOMLA_DIR%\plugins\!GROUP_NAME!\!PLUGIN_NAME!"
+                    set "TARGET=%JOOMLA_INSTANCE%\plugins\!GROUP_NAME!\!PLUGIN_NAME!"
                     if exist "!TARGET!" (
                         echo   SKIP: plugins\!GROUP_NAME!\!PLUGIN_NAME! ^(already exists^)
                     ) else (

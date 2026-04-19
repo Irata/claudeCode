@@ -24,6 +24,17 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+REM --- Load configuration ---
+set "CLAUDECODE_DIR=%~dp0"
+set "CLAUDECODE_DIR=!CLAUDECODE_DIR:~0,-1!"
+if exist "!CLAUDECODE_DIR!\config.bat" (
+    call "!CLAUDECODE_DIR!\config.bat"
+) else (
+    echo Error: config.bat not found. Copy config.bat.example to config.bat and edit it.
+    pause
+    exit /b 1
+)
+
 echo.
 echo ============================================
 echo   Joomla 5 Front-End Design Project Setup
@@ -46,7 +57,7 @@ if "%TEMPLATE_NAME%"=="" (
     exit /b 1
 )
 
-set /p REPO_NAME="Repository folder name (under E:\repositories\) [%PROJECT_NAME%]: "
+set /p REPO_NAME="Repository folder name (under %REPOS_DIR%\) [%PROJECT_NAME%]: "
 if "!REPO_NAME!"=="" (
     set REPO_NAME=%PROJECT_NAME%
 )
@@ -81,11 +92,11 @@ if "!BUILD_CHOICE!"=="2" set BUILD_TOOL=Vite
 if "!BUILD_CHOICE!"=="3" set BUILD_TOOL=Webpack
 
 REM --- Define paths ---
-set PROJECT_DIR=E:\PHPStorm Project Files\%PROJECT_NAME%
+set PROJECT_DIR=%PROJECTS_DIR%\%PROJECT_NAME%
 set CLAUDE_DIR=%PROJECT_DIR%\.claude
-set TEMPLATE=E:\repositories\ClaudeCode\templates\CLAUDE.md.joomla-frontend-template
-set SKILLS_SCRIPT=E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat
-set INCLUDES_SCRIPT=E:\repositories\ClaudeCode\includes\create_include_symlinks.bat
+set TEMPLATE=%CLAUDECODE_DIR%\templates\CLAUDE.md.joomla-frontend-template
+set SKILLS_SCRIPT=%CLAUDECODE_DIR%\skills\create_skill_symlinks.bat
+set INCLUDES_SCRIPT=%CLAUDECODE_DIR%\includes\create_include_symlinks.bat
 
 echo.
 echo ============================================
@@ -93,7 +104,7 @@ echo   Configuration Summary
 echo ============================================
 echo   Project:       %PROJECT_NAME%
 echo   Template:      !TEMPLATE_NAME!
-echo   Repository:    E:\repositories\!REPO_NAME!
+echo   Repository:    %REPOS_DIR%\!REPO_NAME!
 echo   Domain:        !DOMAIN!
 echo   CSS Framework: !CSS_FRAMEWORK!
 echo   Build Tool:    !BUILD_TOOL!
@@ -384,7 +395,7 @@ REM init_joomla_frontend.bat
 if exist "%PROJECT_DIR%\init_joomla_frontend.bat" (
     echo   Exists: init_joomla_frontend.bat
 ) else (
-    mklink "%PROJECT_DIR%\init_joomla_frontend.bat" "E:\repositories\ClaudeCode\init_joomla_frontend.bat" >nul
+    mklink "%PROJECT_DIR%\init_joomla_frontend.bat" "%CLAUDECODE_DIR%\init_joomla_frontend.bat" >nul
     echo   Linked: init_joomla_frontend.bat
 )
 
@@ -392,7 +403,7 @@ REM create_skill_symlinks.bat
 if exist "%PROJECT_DIR%\create_skill_symlinks.bat" (
     echo   Exists: create_skill_symlinks.bat
 ) else (
-    mklink "%PROJECT_DIR%\create_skill_symlinks.bat" "E:\repositories\ClaudeCode\skills\create_skill_symlinks.bat" >nul
+    mklink "%PROJECT_DIR%\create_skill_symlinks.bat" "%CLAUDECODE_DIR%\skills\create_skill_symlinks.bat" >nul
     echo   Linked: create_skill_symlinks.bat
 )
 
@@ -400,7 +411,7 @@ REM --- Step 7: Create template scaffold in repository (optional) ---
 echo.
 echo [7/7] Template scaffold...
 
-set REPO_DIR=E:\repositories\!REPO_NAME!
+set REPO_DIR=%REPOS_DIR%\!REPO_NAME!
 set TPL_DIR=!REPO_DIR!\templates\!TEMPLATE_NAME!
 
 if not exist "!REPO_DIR!" (
@@ -703,7 +714,7 @@ echo   1. Open project in PHPStorm
 echo   2. Verify CLAUDE.md placeholders are replaced
 echo   3. Update .claude\style-guide.md with your design tokens
 echo   4. Update .claude\design-decisions.md with design rationale
-echo   5. Symlink/copy template into Joomla instance: E:\www\!DOMAIN!\templates\
+echo   5. Symlink/copy template into Joomla instance: %JOOMLA_DIR%\!DOMAIN!\templates\
 echo   6. Discover template in Joomla admin: System ^> Templates ^> Site Templates
 echo   7. Set as default template
 echo   8. Start Claude Code in the project directory

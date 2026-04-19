@@ -19,6 +19,17 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+REM --- Load configuration ---
+set "CLAUDECODE_DIR=%~dp0.."
+for %%I in ("!CLAUDECODE_DIR!") do set "CLAUDECODE_DIR=%%~fI"
+if exist "!CLAUDECODE_DIR!\config.bat" (
+    call "!CLAUDECODE_DIR!\config.bat"
+) else (
+    echo Error: config.bat not found. Copy config.bat.example to config.bat and edit it.
+    pause
+    exit /b 1
+)
+
 REM Prompt for PHPStorm project name
 set /p PROJECT_NAME="Enter PHPStorm project name: "
 
@@ -30,8 +41,8 @@ if "%PROJECT_NAME%"=="" (
 )
 
 REM Define source and target directories
-set SOURCE_DIR=e:\repositories\ClaudeCode\skills
-set TARGET_BASE=E:\PHPStorm Project Files
+set SOURCE_DIR=%CLAUDECODE_DIR%\skills
+set TARGET_BASE=%PROJECTS_DIR%
 set TARGET_DIR=%TARGET_BASE%\%PROJECT_NAME%\.claude\skills
 
 REM Check if source directory exists

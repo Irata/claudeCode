@@ -1,0 +1,16 @@
+@echo off
+REM ============================================================================
+REM ClaudeCode Configuration
+REM
+REM Copy this file to config.bat and edit the paths to match your environment.
+REM config.bat is gitignored and will not be overwritten by updates.
+REM ============================================================================
+
+REM Base directory where PHPStorm projects are created
+SET PROJECTS_DIR=E:\PHPStorm Project Files
+
+REM Base directory where git repositories are cloned
+SET REPOS_DIR=E:\repositories
+
+REM Base directory where local Joomla instances are installed
+SET JOOMLA_DIR=E:\www

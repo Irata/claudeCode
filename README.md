@@ -1,6 +1,6 @@
 # ClaudeCode - Joomla 5 Development Toolkit for Claude Code
 
-A collection of specialised agents, reference includes, and project templates designed to streamline Joomla 5 extension development with [Claude Code](https://claude.ai/code). These files are maintained in a single repository and symlinked into individual PHPStorm project directories, ensuring consistent conventions and tooling across all Joomla projects.
+A collection of specialised agents, reference includes, skills, and project templates designed to streamline Joomla 5 extension development with [Claude Code](https://claude.ai/code). These files are maintained in a single repository and symlinked into individual PHPStorm project directories, ensuring consistent conventions and tooling across all Joomla projects.
 
 ## Repository Structure
 
@@ -10,47 +10,30 @@ ClaudeCode/
 │   ├── data-model-architect.md
 │   ├── create_agent_symlinks.bat
 │   └── joomla/
-│       ├── joomla-admin-builder.md
-│       ├── joomla-api-builder.md
-│       ├── joomla-architect.md
-│       ├── joomla-build-agent.md
-│       ├── joomla-cli-builder.md
-│       ├── joomla-code-reviewer.md
-│       ├── joomla-debugger.md
-│       ├── joomla-language-manager.md
-│       ├── joomla-migration-agent.md
-│       ├── joomla-module-builder.md
-│       ├── joomla-orchestrator.md
-│       ├── joomla-performance-agent.md
-│       ├── joomla-plugin-builder.md
-│       ├── joomla-prd-writer.md
-│       ├── joomla-security-auditor.md
-│       ├── joomla-site-builder.md
-│       └── joomla-test-engineer.md
+│       └── (joomla-*.md agent files)
 ├── includes/
 │   ├── create_include_symlinks.bat
-│   ├── .mcp.json
-│   ├── context7.json
-│   ├── joomla-coding-preferences.md
-│   ├── joomla-devel-environment.md
-│   ├── joomla5-depreciated.md
-│   ├── joomla5-di-patterns.md
-│   ├── joomla5-events-system.md
-│   ├── joomla5-structure-api.md
-│   ├── joomla5-structure-cli.md
-│   ├── joomla5-structure-component.md
-│   ├── joomla5-structure-module.md
-│   └── joomla5-structure-plugin.md
+│   └── (reference .md and config files)
+├── skills/
+│   ├── create_skill_symlinks.bat
+│   ├── conversation-log/
+│   ├── joomla/
+│   ├── rebuild-includes/
+│   └── work-log/
 ├── templates/
 │   ├── CLAUDE.md.joomla-template
-│   ├── project-ecosystem.accountdata-template.md
-│   ├── project-ecosystem.entitydata-template.md
-│   └── project-ecosystem.inventorydata-template.md
+│   ├── CLAUDE.md.joomla-frontend-template
+│   ├── Phing/
+│   └── (project-ecosystem templates)
 ├── docs/
 │   ├── agent-usage-guide.md
 │   ├── INTERPROJECT-REFERENCES.md
 │   └── PROJECT-ECOSYSTEM.md
+├── config.bat.example
+├── config.bat              (gitignored — your local paths)
 ├── init_joomla_project.bat
+├── init_joomla_frontend.bat
+├── symlink.bat
 └── README.md
 ```
 
@@ -109,31 +92,98 @@ This means every agent and conversation in the project automatically has access 
 | **context7.json** | Context7 library references for enhanced development context |
 | **.mcp.json** | MCP server configuration |
 
+## Skills
+
+Skill files live in `.claude/skills/` within each project and provide Claude Code with slash-command workflows — reusable, project-aware operations invoked with `/<skill-name>`. Each skill is a directory containing a `SKILL.md` file.
+
+| Skill | Purpose |
+|-------|---------|
+| **conversation-log** | Logs conversation summaries and decisions for project continuity |
+| **work-log** | Records work sessions with progress, blockers, and next steps |
+| **rebuild-includes** | Regenerates include files from source documentation |
+| **version-bump** | Bumps extension version numbers across manifest XML, update XML, and changelog *(under joomla/)* |
+
 ## Templates
 
 Templates provide starting points for new projects and extensions. They contain placeholder variables (e.g. `{{PROJECT_NAME}}`, `{{VENDOR_NAMESPACE}}`) that are replaced with project-specific values during initialisation.
 
-| Template | Purpose |
-|----------|---------|
-| **CLAUDE.md.joomla-template** | Main project CLAUDE.md template — includes project configuration, namespace conventions, agent orchestration workflow, and all `@includes/` references |
-| **project-ecosystem.accountdata-template.md** | Data model template for accounting/financial extensions |
-| **project-ecosystem.entitydata-template.md** | Data model template for entity management extensions (customers, suppliers, contacts) |
-| **project-ecosystem.inventorydata-template.md** | Data model template for inventory management extensions |
+| Template                                        | Purpose                                                                                                                                        |
+|-------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| **CLAUDE.md.joomla-template**                   | Main project CLAUDE.md template — includes project configuration, namespace conventions, agent orchestration workflow, and all `@includes/` references |
+| **CLAUDE.md.joomla-frontend-template**          | Front-end/template design project CLAUDE.md — CSS architecture, template overrides, accessibility, and performance budgets                     |
+| **Phing/**                                      | Build XML templates copied into extension repositories for packaging and deployment                                                            |
+| **project-ecosystem.accountdata-template.md**   | Data model template for accounting/financial extensions                                                                                        |
+| **project-ecosystem.entitydata-template.md**    | Data model template for entity management extensions (customers, suppliers, contacts)                                                          |
+| **project-ecosystem.inventorydata-template.md** | Data model template for inventory management extensions                                                                                        |
+
+## Configuration
+
+All batch scripts read directory paths from a `config.bat` file in the repository root. This keeps environment-specific paths out of the scripts and makes the toolkit portable across machines.
+
+### First-Time Setup
+
+```
+copy config.bat.example config.bat
+```
+
+Edit `config.bat` to match your directory layout:
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `PROJECTS_DIR` | Where PHPStorm projects are created | `E:\PHPStorm Project Files` |
+| `REPOS_DIR` | Where git repositories are cloned | `E:\repositories` |
+| `JOOMLA_DIR` | Where local Joomla instances live | `E:\www` |
+
+`config.bat` is gitignored — it will not be overwritten by updates.
+
+The ClaudeCode repository path (`CLAUDECODE_DIR`) is auto-detected by each script from its own location, so it does not need to be configured.
 
 ## Batch Files
 
+All batch scripts require **Administrator privileges** (for symlink/junction creation on Windows). They will self-elevate if not already running as admin.
+
 ### `init_joomla_project.bat`
 
-The main project initialisation script. Run this when starting a new Joomla extension project. It:
+The main project initialisation script for **Joomla extension development**. Run this when starting a new component, plugin, or module project.
 
-1. Prompts for project details (name, vendor namespace, repository name, domain, database connection)
-2. Creates the PHPStorm project directory with the `.claude/` structure
-3. Generates a customised `CLAUDE.md` from the template with all placeholders replaced
-4. Creates stub files for `project-ecosystem.md` and `architecture.md`
-5. Runs the agent and include symlink scripts (see below)
-6. Displays a summary with next steps
+**What it does (10 steps):**
 
-**Requires Administrator privileges** (for symlink creation on Windows).
+1. **Creates project directory** — `%PROJECTS_DIR%\<name>` with `.claude\` structure
+2. **Generates CLAUDE.md** — from `templates/CLAUDE.md.joomla-template` with all placeholders replaced (vendor namespace, repository name, domain, database connection)
+3. **Creates documentation stubs** — `project-ecosystem.md` and `architecture.md` in `.claude\`
+4. **Symlinks agents** — runs `create_agent_symlinks.bat`, prompts to confirm each agent
+5. **Symlinks includes** — runs `create_include_symlinks.bat`, prompts to confirm each include
+6. **Symlinks skills** — runs `create_skill_symlinks.bat`, prompts to confirm each skill
+7. **Links symlink.bat** — creates a symlink in the extension repository for easy access
+8. **Copies Phing templates** — copies build XML files into the repository's `Phing\` directory
+9. **Links utility scripts** — symlinks `init_joomla_project.bat`, `symlink.bat`, and `create_skill_symlinks.bat` into the project directory for convenience
+10. **Displays summary** — shows all created paths and next steps
+
+**Prompts for:**
+- PHPStorm project name
+- Vendor namespace (e.g., `Acme`)
+- Repository folder name (defaults to project name)
+- Joomla domain / folder name (defaults to project name)
+- Database connection name (defaults to `<project>_dev`)
+
+### `init_joomla_frontend.bat`
+
+Project initialisation for **Joomla template/front-end design** projects. Similar structure to `init_joomla_project.bat` but tailored for template development.
+
+**Prompts for:**
+- PHPStorm project name and Joomla template name
+- Repository folder name and Joomla domain
+- CSS framework choice (Bootstrap 5, Tailwind CSS, or Custom)
+- Build tool choice (None, Vite, or Webpack)
+
+**Creates:** project directory, CLAUDE.md, style-guide and design-decisions stubs, skill/include symlinks, and optionally scaffolds a full Joomla template directory with `templateDetails.xml`, `index.php`, `joomla.asset.json`, language files, and asset stubs.
+
+### `symlink.bat`
+
+Creates Windows junction links from a repository's extension source directories into a local Joomla installation for live development. Automatically detects and links:
+
+- **Components**: `admin/`, `site/`, `api/`, `media/` subdirectories
+- **Plugins**: auto-detects single-level and `group/name` directory structures
 
 ### `agents/create_agent_symlinks.bat`
 
@@ -143,29 +193,34 @@ Creates symbolic links from the agent files in this repository into a target pro
 
 Creates symbolic links from the include files in this repository into a target project's `.claude/includes/` directory. Works the same way as the agent symlink script.
 
+### `skills/create_skill_symlinks.bat`
+
+Creates junction links from skill directories in this repository into a target project's `.claude/skills/` directory. Discovers skills recursively (supports nested directories like `joomla/version-bump/`) but links them flat into the target, as Claude Code only discovers skills at the root of `.claude/skills/`.
+
 ## How Symlinks Work
 
-All agent and include files are maintained in this single repository. Rather than copying these files into each Joomla project, **symbolic links** are created that point back to the originals.
+All agent, include, and skill files are maintained in this single repository. Rather than copying these files into each Joomla project, **symbolic links** (for files) and **junctions** (for directories) are created that point back to the originals.
 
 ```
-E:\PHPStorm Project Files\MyProject\
+<PROJECTS_DIR>\MyProject\
 └── .claude\
     ├── agents\
     │   └── joomla\
-    │       ├── joomla-architect.md  →  E:\repositories\ClaudeCode\agents\joomla\joomla-architect.md
-    │       ├── joomla-admin-builder.md  →  E:\repositories\ClaudeCode\agents\joomla\joomla-admin-builder.md
+    │       ├── joomla-architect.md  →  <REPOS_DIR>\ClaudeCode\agents\joomla\joomla-architect.md
     │       └── ...
-    └── includes\
-        ├── joomla-coding-preferences.md  →  E:\repositories\ClaudeCode\includes\joomla-coding-preferences.md
-        ├── joomla5-structure-component.md  →  E:\repositories\ClaudeCode\includes\joomla5-structure-component.md
+    ├── includes\
+    │   ├── joomla-coding-preferences.md  →  <REPOS_DIR>\ClaudeCode\includes\joomla-coding-preferences.md
+    │   └── ...
+    └── skills\
+        ├── work-log\  →  <REPOS_DIR>\ClaudeCode\skills\work-log\
         └── ...
 ```
 
 This approach provides:
 
-- **Single source of truth** — edit an agent or include file once in this repository and the change is immediately reflected in every project that links to it.
+- **Single source of truth** — edit an agent, include, or skill file once in this repository and the change is immediately reflected in every project that links to it.
 - **Consistency** — all projects share the same coding standards, structural references, and agent instructions.
-- **Selective linking** — the batch scripts prompt for confirmation on each file, so projects can include only the agents and includes they need.
+- **Selective linking** — the batch scripts prompt for confirmation on each item, so projects can include only the agents, includes, and skills they need.
 - **No duplication** — avoids maintaining separate copies of the same files across dozens of projects.
 
 ## Docs
@@ -180,9 +235,10 @@ Supporting documentation for the agent ecosystem and multi-extension architectur
 
 ## Getting Started
 
-1. Clone this repository to `E:\repositories\ClaudeCode`
-2. Run `init_joomla_project.bat` to set up a new project
-3. Open the project in PHPStorm
-4. Start Claude Code in the project directory
-5. Use `joomla-architect` to design your extension
-6. Use the appropriate builder agent(s) for implementation
+1. Clone this repository
+2. Copy `config.bat.example` to `config.bat` and edit the paths to match your environment
+3. Run `init_joomla_project.bat` (extension development) or `init_joomla_frontend.bat` (template design)
+4. Follow the prompts — the script creates the project directory, generates CLAUDE.md, and symlinks agents/includes/skills
+5. Open the project in PHPStorm
+6. Start Claude Code in the project directory
+7. Use `joomla-architect` to design your extension, then the appropriate builder agent(s) for implementation

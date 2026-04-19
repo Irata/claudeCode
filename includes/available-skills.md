@@ -4,6 +4,7 @@
 
 | Skill | Description | Example |
 |-------|-------------|---------|
+| `/conversation-log` | Record prompts and responses from the current Claude Code session into a structured conversation log | `/conversation-log` |
 | `/rebuild-includes` | Regenerate the dynamic include files (available-agents.md and available-skills.md) by scanning agent and skill directories for frontmatter | `/rebuild-includes` |
 | `/work-log` | Scan the repository for file modifications and append structured daily entries to the project work log | `/work-log include today` |
 

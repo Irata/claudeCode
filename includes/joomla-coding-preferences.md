@@ -1,3 +1,9 @@
+## Joomla First Philosophy
+
+**Always use Joomla's built-in classes, patterns, and MVC architecture before reaching for custom solutions or raw PHP.** Joomla provides a complete framework — use it. Every database write goes through a Table class. Every list/form page uses a ListModel/FormModel. Every service uses a Model that uses a Table. No exceptions.
+
+---
+
 ## Coding Standards for Joomla projects
 
 ### Namespacing Guidelines
@@ -29,10 +35,92 @@
 - For HikaShop legacy plugins, use `$this->app->getInput()` (available via the parent class) — NOT `hikaInput::get()` or raw superglobals.
 - Filter and validate all input at the point of retrieval. Never trust client-supplied values for security-sensitive decisions (e.g., payment status).
 
+### Joomla Classes — Use Instead of Raw PHP
+
+| Need | Use Joomla Class | NOT |
+|------|-----------------|-----|
+| Application instance | `Factory::getApplication()` | Global variables |
+| Database access | `$this->getDatabase()` (in Models/Tables) | `new PDO()` or raw `mysqli` |
+| User input | `$app->getInput()` or `InputFilter` | `$_GET`, `$_POST`, `$_REQUEST` |
+| Current user | `Factory::getApplication()->getIdentity()` | `$_SESSION` |
+| URLs | `Uri::root()`, `Uri::base()`, `Route::_()` | Hardcoded URLs |
+| Dates | `new Joomla\CMS\Date\Date()` | `date()`, `new \DateTime()` |
+| Language/i18n | `Text::_('COM_KEY')`, `Text::sprintf()` | Hardcoded strings |
+| File operations | `File::copy()`, `Folder::create()` | `copy()`, `mkdir()` |
+| Mail | `Factory::getMailer()` | `mail()`, `PHPMailer` directly |
+| Session | `Factory::getApplication()->getSession()` | `$_SESSION` |
+| Config values | `ComponentHelper::getParams('com_name')` | Hardcoded config |
+| Events | `DispatcherInterface` + `EventInterface` | Custom observer pattern |
+| Logging | `Log::add()` | `error_log()`, `file_put_contents()` |
+| HTTP client | `HttpFactory::getHttp()` | `curl_*()`, `file_get_contents()` |
+| Pagination | `Pagination` class in ListModel | Custom pagination |
+| Form handling | `Form` class with XML definitions | Manual HTML forms |
+| Access control | `$user->authorise()` | Custom permission checks |
+| Categories | `CategoriesServiceInterface` | Custom category trees |
+
 ### Design Patterns
 - Do NOT use the Repository design pattern in Joomla extensions. Use Joomla's native Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) for all data access.
 - Models handle database queries, state management, and business logic — there is no need for a separate Repository layer.
 - Services MUST NOT access the database directly. All data access flows through DataModel methods.
+
+### MVC Pattern: Controller → Model → Table
+
+For admin list/form pages with standard CRUD operations:
+
+```
+Controller (AdminController/FormController)
+    → Model (ListModel for lists, AdminModel for forms)
+        → Table (extends Joomla\CMS\Table\Table)
+            → Database
+```
+
+- **Controller**: Handles HTTP requests, checks ACL, delegates to Model
+- **Model**: Query building, state management, validation, calls Table for writes
+- **Table**: Single-row CRUD — `save()`, `delete()`, `publish()`, `check()`, `bind()`
+
+#### Standard Toolbar Buttons (Modern API)
+
+Admin views use `$toolbar = $this->getDocument()->getToolbar()` to access the toolbar object, then call instance methods. Use `ToolbarHelper::title()` for the page title (NOT deprecated).
+
+| Button | Method |
+|--------|--------|
+| New | `$toolbar->addNew('{entity}.add')` |
+| Delete | `$toolbar->delete('{entities}.delete')->message('JGLOBAL_CONFIRM_DELETE')->listCheck(true)` |
+| Publish | `$toolbar->publish('{entities}.publish')->listCheck(true)` |
+| Unpublish | `$toolbar->unpublish('{entities}.unpublish')->listCheck(true)` |
+| Archive | `$toolbar->archive('{entities}.archive')->listCheck(true)` |
+| Trash | `$toolbar->trash('{entities}.trash')->listCheck(true)` |
+| Apply | `$toolbar->apply('{entity}.apply')` |
+| Save | `$toolbar->save('{entity}.save')` |
+| Save & New | `$toolbar->save2new('{entity}.save2new')` |
+| Save as Copy | `$toolbar->save2copy('{entity}.save2copy')` |
+| Cancel / Close | `$toolbar->cancel('{entity}.cancel', 'JTOOLBAR_CLOSE')` |
+| Options | `$toolbar->preferences('com_{name}')` |
+
+### Model → Table Relationship (Critical Rule)
+
+**Models MUST NOT write directly to the database via raw SQL.** All database writes go through Table classes:
+
+```php
+// ✓ CORRECT — Model uses Table for writes
+$table = $this->getTable();
+$table->bind($data);
+$table->check();
+$table->store();
+
+// ✓ CORRECT — Table methods for state changes
+$table->publish($pks, $value);
+$table->delete($pk);
+
+// ✗ WRONG — Raw SQL in Model
+$db->setQuery('UPDATE #__items SET state = 1 WHERE id = ' . $id)->execute();
+
+// ✗ WRONG — Direct insert/update queries in Model
+$query->insert('#__items')->columns(...)->values(...);
+$db->setQuery($query)->execute();
+```
+
+**Models MAY use raw SQL for SELECT queries** (read operations) — this is normal for building list queries in `getListQuery()`. The rule is: **reads via query builder, writes via Table**.
 
 ### Manifest XML Naming
 - Component manifest files MUST be named `{name}.xml` (e.g. `forum.xml`, `community.xml`), **NOT** `com_{name}.xml`.
@@ -194,6 +282,43 @@ Existing committed files: 2.4.0.sql, 2.4.1.sql, 2.4.2.sql
 - Use `DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci` for all tables
 - Use `ENGINE=InnoDB` for all tables
 
+#### SQL Update Files — One Operation Per ALTER TABLE
+
+Joomla's Database Checker (`MysqlChangeItem::buildCheckQuery()`) parses each SQL statement in update files and generates a verification query to confirm the change was applied. **It only handles the first operation in each `ALTER TABLE` statement.** Multi-operation statements cause two problems:
+
+1. **`CHANGE` / `MODIFY`** — Trailing commas from subsequent operations leak into the generated `SHOW COLUMNS ... WHERE` check query, producing SQL syntax errors (e.g. `` `default` = NULL, AND `null` = 'YES' ``).
+2. **`ADD COLUMN`** — Only the first column is verified; columns 2+ are silently skipped.
+
+**Rule**: Always use **one DDL operation per `ALTER TABLE` statement** in SQL update files.
+
+```sql
+-- WRONG — multi-column CHANGE breaks the Database Checker
+ALTER TABLE `#__example`
+    CHANGE `old_col` `new_col` VARCHAR(255) DEFAULT NULL,
+    CHANGE `depth` `legacy_depth` INT DEFAULT NULL;
+
+-- CORRECT — separate statements
+ALTER TABLE `#__example`
+    CHANGE `old_col` `new_col` VARCHAR(255) DEFAULT NULL;
+
+ALTER TABLE `#__example`
+    CHANGE `depth` `legacy_depth` INT DEFAULT NULL;
+
+-- WRONG — only first ADD COLUMN gets verified
+ALTER TABLE `#__example`
+    ADD COLUMN `lft` INT NOT NULL DEFAULT 0,
+    ADD COLUMN `rgt` INT NOT NULL DEFAULT 0;
+
+-- CORRECT — each column individually verified
+ALTER TABLE `#__example`
+    ADD COLUMN `lft` INT NOT NULL DEFAULT 0;
+
+ALTER TABLE `#__example`
+    ADD COLUMN `rgt` INT NOT NULL DEFAULT 0;
+```
+
+> **Note**: `CREATE TABLE` statements in `install.mysql.utf8.sql` are NOT affected — the checker only verifies table existence for those. This rule applies to `ALTER TABLE` in update files only.
+
 #### Standard Joomla System Fields for Core/CRUD Tables
 
 Main entity tables where users create, edit, and manage records through CRUD interfaces MUST include these standard Joomla system fields:
@@ -315,6 +440,8 @@ KEY `idx_lft` (`lft`)
 
 ### View HtmlView Preferences
 - Use the direct model call pattern, not deprecated `$this->get()` magic method
+- **Toolbar setup**: Use `$toolbar = $this->getDocument()->getToolbar()` to get the Toolbar object, then call instance methods (`$toolbar->addNew()`, `$toolbar->save()`, etc.). Do NOT use `ToolbarHelper::` static button methods (e.g. `ToolbarHelper::addNew()`, `ToolbarHelper::save()`) — they are deprecated since Joomla 5.0.
+- **Page title**: Use `ToolbarHelper::title()` for setting the page title and icon — this specific static method remains the standard approach as it sets both the toolbar title element and the browser page title.
 - **Edit/Form views MUST load the form validator** via Web Asset Manager: `$this->document->getWebAssetManager()->useScript('form.validate');`
 - Place the `useScript` call in `display()` after `addToolbar()` and before `parent::display($tpl)`
 - Without this, the `form-validate` CSS class on the `<form>` element causes a JS error: `document.formvalidator is undefined`

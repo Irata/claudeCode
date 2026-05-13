@@ -1,4 +1,4 @@
-# Joomla 5 Multi-Agent Development System — Usage Guide
+# Joomla Multi-Agent Development System — Usage Guide
 
 ## Getting Started
 
@@ -70,7 +70,7 @@ The `joomla-orchestrator` is the primary entry point for complex, multi-extensio
 
 #### New Component Build with Services
 ```
-Build a Joomla 5 component called com_bookstore (a book shop/library system).
+Build a Joomla component called com_bookstore (a book shop/library system).
 
 Core Services (business logic):
 - CheckoutService: process book orders (validate, apply discounts, create order)
@@ -126,7 +126,7 @@ with the existing services from com_emporium.
 
 #### Full Extension Package with Services
 ```
-Create a complete Joomla 5 package (pkg_bookstore) containing:
+Create a complete Joomla package (pkg_bookstore) containing:
 
 COMPONENT (com_bookstore):
 - Defines all Services:
@@ -371,7 +371,7 @@ Service (business logic orchestrator)
 
 ### Service Layer Design
 
-All Joomla 5 extensions with business logic should have a `src/Service/` folder in the Administrator layer, with corresponding Service Models in `src/Model/`:
+All Joomla extensions with business logic should have a `src/Service/` folder in the Administrator layer, with corresponding Service Models in `src/Model/`:
 
 ```
 Acme\Component\Bookstore\Administrator\

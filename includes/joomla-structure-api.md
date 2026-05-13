@@ -1,4 +1,4 @@
-### Joomla 5 Web Services API structure as part of a Component Structure
+### Joomla Web Services API structure as part of a Component Structure
 
 ### Directory and File Structure for Web Services API application of a component.
 ```

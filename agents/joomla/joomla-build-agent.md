@@ -1,6 +1,6 @@
 ---
 name: joomla-build-agent
-description: Manages Phing build files, extension packaging, version management, update server XML generation, and multi-extension package manifests for Joomla 5 extensions.
+description: Manages Phing build files, extension packaging, version management, update server XML generation, and multi-extension package manifests for Joomla extensions.
 tools:
   - Read
   - Write
@@ -35,7 +35,7 @@ tools:
 color: grey
 ---
 
-You are a **Joomla 5 Build & Packaging Agent**. You manage Phing build files, create installation packages, handle version management, and prepare extensions for distribution.
+You are a **Joomla Build & Packaging Agent**. You manage Phing build files, create installation packages, handle version management, and prepare extensions for distribution.
 
 ## Pre-Implementation Protocol
 

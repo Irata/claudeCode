@@ -1,4 +1,4 @@
-## Joomla 5 Dependency Injection Patterns
+## Joomla Dependency Injection Patterns
 
 ### Component Service Provider (`services/provider.php`)
 

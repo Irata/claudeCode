@@ -1,4 +1,4 @@
-# {{PROJECT_NAME}} - Joomla 5 Extension Project
+# {{PROJECT_NAME}} - Joomla Extension Project
 
 ## Project Configuration
 
@@ -70,29 +70,29 @@ All extensions in this project use the vendor namespace `{{VENDOR_NAMESPACE}}`:
 ## Extension Structure References
 
 ### Component
-@includes/joomla5-structure-component.md
+@includes/joomla-structure-component.md
 
 ### API
-@includes/joomla5-structure-api.md
+@includes/joomla-structure-api.md
 
 ### Plugin
-@includes/joomla5-structure-plugin.md
+@includes/joomla-structure-plugin.md
 
 ### Module
-@includes/joomla5-structure-module.md
+@includes/joomla-structure-module.md
 
 ### CLI
-@includes/joomla5-structure-cli.md
+@includes/joomla-structure-cli.md
 
 ## Architecture References
 
-@includes/joomla5-di-patterns.md
+@includes/joomla-di-patterns.md
 
-@includes/joomla5-events-system.md
+@includes/joomla-events-system.md
 
 ## Deprecated Patterns (AVOID)
 
-@includes/joomla5-depreciated.md
+@includes/joomla-depreciated.md
 
 ## Inter-Project Dependencies
 
@@ -248,7 +248,7 @@ Skills are symlinked from `E:\repositories\ClaudeCode\skills\` into each project
 - [ ] Configure database connection `{{DB_CONNECTION_NAME}}` in Joomla
 - [ ] Set up Joomla development instance at `E:\www\{{DOMAIN}}`
 - [ ] Review `includes/joomla-coding-preferences.md` for code standards
-- [ ] Review `includes/joomla5-di-patterns.md` for DI patterns
+- [ ] Review `includes/joomla-di-patterns.md` for DI patterns
 - [ ] Invoke `joomla-architect` to design the extension
 - [ ] Invoke appropriate builder agent(s) for implementation
 - [ ] Run `vendor/bin/phpunit` to execute tests
@@ -328,9 +328,9 @@ Skills are symlinked from `E:\repositories\ClaudeCode\skills\` into each project
 - `E:\repositories\ClaudeCode\docs\PROJECT-ECOSYSTEM.md` — Multi-extension ecosystem
 - `E:\repositories\ClaudeCode\docs\INTERPROJECT-REFERENCES.md` — Inter-project patterns
 - `E:\repositories\ClaudeCode\includes\joomla-coding-preferences.md` — Code standards
-- `E:\repositories\ClaudeCode\includes\joomla5-di-patterns.md` — DI patterns
-- `E:\repositories\ClaudeCode\includes\joomla5-events-system.md` — Events system
-- `E:\repositories\ClaudeCode\includes\joomla5-depreciated.md` — Avoid these patterns
+- `E:\repositories\ClaudeCode\includes\joomla-di-patterns.md` — DI patterns
+- `E:\repositories\ClaudeCode\includes\joomla-events-system.md` — Events system
+- `E:\repositories\ClaudeCode\includes\joomla-depreciated.md` — Avoid these patterns
 - `E:\repositories\ClaudeCode\includes\joomla-devel-environment.md` — Dev environment setup
 
 **Official Documentation**:

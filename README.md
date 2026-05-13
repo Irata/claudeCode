@@ -1,6 +1,6 @@
-# ClaudeCode - Joomla 5 Development Toolkit for Claude Code
+# ClaudeCode - Joomla Development Toolkit for Claude Code
 
-A collection of specialised agents, reference includes, skills, and project templates designed to streamline Joomla 5 extension development with [Claude Code](https://claude.ai/code). These files are maintained in a single repository and symlinked into individual PHPStorm project directories, ensuring consistent conventions and tooling across all Joomla projects.
+A collection of specialised agents, reference includes, skills, and project templates designed to streamline Joomla extension development with [Claude Code](https://claude.ai/code). These files are maintained in a single repository and symlinked into individual PHPStorm project directories, ensuring consistent conventions and tooling across all Joomla projects.
 
 ## Repository Structure
 
@@ -52,7 +52,7 @@ Agent files live in `.claude/agents/` within each project and provide Claude Cod
 | **joomla-site-builder** | Builds the public-facing frontend — controllers, models, views, router, and menu integration |
 | **joomla-api-builder** | Creates REST API endpoints with JSON views and webservices plugin registration |
 | **joomla-cli-builder** | Creates Symfony Console CLI commands for Joomla's `cli/joomla.php` |
-| **joomla-module-builder** | Builds modules using the Joomla 5 dispatcher pattern with helper factory DI |
+| **joomla-module-builder** | Builds modules using the Joomla dispatcher pattern with helper factory DI |
 | **joomla-plugin-builder** | Creates plugins for any event group using the subscriber/dispatcher pattern |
 | **joomla-build-agent** | Manages Phing build files, extension packaging, version management, and update server XML |
 | **joomla-code-reviewer** | Reviews code for PHP 8.3+ standards, Joomla conventions, and architectural patterns |
@@ -81,14 +81,14 @@ This means every agent and conversation in the project automatically has access 
 |------|---------|
 | **joomla-coding-preferences.md** | Coding standards — namespacing, PHP 8.3+ conventions, design patterns, configuration rules, and database schema conventions |
 | **joomla-devel-environment.md** | Development environment setup — directory paths, source mapping, and local server configuration |
-| **joomla5-structure-component.md** | Reference directory and file structure for Joomla 5 components (administrator and site) |
-| **joomla5-structure-module.md** | Reference directory and file structure for Joomla 5 modules |
-| **joomla5-structure-plugin.md** | Reference directory and file structure for Joomla 5 plugins |
-| **joomla5-structure-api.md** | Reference directory and file structure for Joomla 5 REST API extensions |
-| **joomla5-structure-cli.md** | Reference directory and file structure for Joomla 5 CLI commands |
-| **joomla5-di-patterns.md** | Dependency injection patterns — service providers, container registration, and factory patterns |
-| **joomla5-events-system.md** | Joomla 5 event system — dispatching, subscribing, and event class conventions |
-| **joomla5-depreciated.md** | Deprecated Joomla patterns to avoid — legacy APIs, removed features, and migration paths |
+| **joomla-structure-component.md** | Reference directory and file structure for Joomla components (administrator and site) |
+| **joomla-structure-module.md** | Reference directory and file structure for Joomla modules |
+| **joomla-structure-plugin.md** | Reference directory and file structure for Joomla plugins |
+| **joomla-structure-api.md** | Reference directory and file structure for Joomla REST API extensions |
+| **joomla-structure-cli.md** | Reference directory and file structure for Joomla CLI commands |
+| **joomla-di-patterns.md** | Dependency injection patterns — service providers, container registration, and factory patterns |
+| **joomla-events-system.md** | Joomla event system — dispatching, subscribing, and event class conventions |
+| **joomla-depreciated.md** | Deprecated Joomla patterns to avoid — legacy APIs, removed features, and migration paths |
 | **context7.json** | Context7 library references for enhanced development context |
 | **.mcp.json** | MCP server configuration |
 

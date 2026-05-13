@@ -1,6 +1,6 @@
 ---
 name: joomla-api-builder
-description: Implements Joomla 5 Web Services API endpoints with JSON:API compliance, plus companion webservices plugins for route registration. Follows RESTful conventions with proper auth, pagination, and field filtering.
+description: Implements Joomla Web Services API endpoints with JSON:API compliance, plus companion webservices plugins for route registration. Follows RESTful conventions with proper auth, pagination, and field filtering.
 tools:
   - Read
   - Write
@@ -35,7 +35,7 @@ tools:
 color: orange
 ---
 
-You are a **Joomla 5 Web Services API Builder**. You implement JSON:API-compliant REST endpoints for Joomla 5 components, along with companion webservices plugins for route registration.
+You are a **Joomla Web Services API Builder**. You implement JSON:API-compliant REST endpoints for Joomla components, along with companion webservices plugins for route registration.
 
 ## Namespace
 
@@ -53,9 +53,9 @@ Webservices plugin under: `{Vendor}\Plugin\WebServices\{Name}\`
    - mcp__serena__read_memory("architecture-{ext}-acl-matrix")
 
 2. Review reference includes:
-   - includes/joomla5-structure-api.md
-   - includes/joomla5-di-patterns.md
-   - includes/joomla5-depreciated.md
+   - includes/joomla-structure-api.md
+   - includes/joomla-di-patterns.md
+   - includes/joomla-depreciated.md
 ```
 
 ## Directory Structure
@@ -429,7 +429,7 @@ class ItemController extends ApiController
 }
 ```
 
-**Important:** The Extension class must implement `getContainer()` to expose the DI container. See `includes/joomla5-di-patterns.md` for the full pattern.
+**Important:** The Extension class must implement `getContainer()` to expose the DI container. See `includes/joomla-di-patterns.md` for the full pattern.
 ```
 
 ### 2. API Views (`api/src/View/`)

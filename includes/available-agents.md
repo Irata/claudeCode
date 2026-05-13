@@ -10,20 +10,20 @@
 
 | Agent | Description |
 |-------|-------------|
-| `joomla-admin-builder` | Implements the administrator/backend side of Joomla 5 components |
-| `joomla-api-builder` | Implements Joomla 5 Web Services API endpoints with JSON:API compliance |
-| `joomla-architect` | Joomla 5 architecture and design specialist |
+| `joomla-admin-builder` | Implements the administrator/backend side of Joomla components |
+| `joomla-api-builder` | Implements Joomla Web Services API endpoints with JSON:API compliance |
+| `joomla-architect` | Joomla architecture and design specialist |
 | `joomla-build-agent` | Manages Phing build files, extension packaging, version management, and update server XML generation |
-| `joomla-cli-builder` | Creates Joomla 5 CLI console commands using Symfony Console integration |
-| `joomla-code-reviewer` | Expert Joomla 5 code review specialist with access to current documentation and best practices |
-| `joomla-debugger` | Diagnoses and fixes bugs in Joomla 5 extensions through systematic root cause analysis |
-| `joomla-language-manager` | Manages all .ini/.sys.ini language files for Joomla 5 extensions |
-| `joomla-migration-agent` | Upgrades Joomla 3/4 extensions to Joomla 5 |
-| `joomla-module-builder` | Creates Joomla 5 modules (site and admin) using the modern dispatcher pattern |
-| `joomla-orchestrator` | Primary orchestrator for Joomla 5 multi-agent development |
-| `joomla-performance-agent` | Performance analysis and optimization specialist for Joomla 5 extensions |
-| `joomla-plugin-builder` | Creates Joomla 5 plugins across all groups using SubscriberInterface |
+| `joomla-cli-builder` | Creates Joomla CLI console commands using Symfony Console integration |
+| `joomla-code-reviewer` | Expert Joomla code review specialist with access to current documentation and best practices |
+| `joomla-debugger` | Diagnoses and fixes bugs in Joomla extensions through systematic root cause analysis |
+| `joomla-language-manager` | Manages all .ini/.sys.ini language files for Joomla extensions |
+| `joomla-migration-agent` | Upgrades Joomla 3/4 extensions to modern Joomla |
+| `joomla-module-builder` | Creates Joomla modules (site and admin) using the modern dispatcher pattern |
+| `joomla-orchestrator` | Primary orchestrator for Joomla multi-agent development |
+| `joomla-performance-agent` | Performance analysis and optimization specialist for Joomla extensions |
+| `joomla-plugin-builder` | Creates Joomla plugins across all groups using SubscriberInterface |
 | `joomla-prd-writer` | Creates Product Requirements Documents that translate business needs into technical specifications |
-| `joomla-security-auditor` | Security-focused code analysis for Joomla 5 extensions |
-| `joomla-site-builder` | Implements the site/frontend side of Joomla 5 components |
-| `joomla-test-engineer` | Creates PHPUnit 10+ tests for Joomla 5 extensions |
+| `joomla-security-auditor` | Security-focused code analysis for Joomla extensions |
+| `joomla-site-builder` | Implements the site/frontend side of Joomla components |
+| `joomla-test-engineer` | Creates PHPUnit 10+ tests for Joomla extensions |

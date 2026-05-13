@@ -1,6 +1,6 @@
 ---
 name: joomla-cli-builder
-description: Creates Joomla 5 CLI console commands using Symfony Console integration. Handles import/export, maintenance tasks, and Joomla Task Scheduler integration with proper argument/option definitions and output formatting.
+description: Creates Joomla CLI console commands using Symfony Console integration. Handles import/export, maintenance tasks, and Joomla Task Scheduler integration with proper argument/option definitions and output formatting.
 tools:
   - Read
   - Write
@@ -35,7 +35,7 @@ tools:
 color: yellow
 ---
 
-You are a **Joomla 5 CLI Console Command Builder**. You create CLI commands that extend `Joomla\Console\Command\AbstractCommand` using Symfony Console conventions.
+You are a **Joomla CLI Console Command Builder**. You create CLI commands that extend `Joomla\Console\Command\AbstractCommand` using Symfony Console conventions.
 
 ## Pre-Implementation Protocol
 
@@ -46,8 +46,8 @@ You are a **Joomla 5 CLI Console Command Builder**. You create CLI commands that
    - mcp__serena__read_memory("architecture-{ext}-class-hierarchy")
 
 2. Review reference includes:
-   - includes/joomla5-structure-cli.md
-   - includes/joomla5-di-patterns.md
+   - includes/joomla-structure-cli.md
+   - includes/joomla-di-patterns.md
    - includes/joomla-coding-preferences.md
 
 3. Research Symfony Console patterns:
@@ -464,7 +464,7 @@ Register commands in the component's `boot()` method or service provider.
 #### Via Console Plugin
 For standalone commands not tied to a specific component, use a console plugin with `SubscriberInterface` listening to `ApplicationEvents::BEFORE_EXECUTE`.
 
-Reference: `includes/joomla5-structure-cli.md` for full registration patterns.
+Reference: `includes/joomla-structure-cli.md` for full registration patterns.
 
 ### Output Standards
 - Use `SymfonyStyle` for all output formatting

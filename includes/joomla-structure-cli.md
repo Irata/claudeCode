@@ -1,4 +1,4 @@
-## Joomla 5 CLI Console Command Structure
+## Joomla CLI Console Command Structure
 
 ### CLI Command Location Within a Component
 ```

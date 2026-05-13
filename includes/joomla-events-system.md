@@ -1,8 +1,8 @@
-## Joomla 5 Events System Reference
+## Joomla Events System Reference
 
 ### SubscriberInterface Implementation
 
-All modern Joomla 5 plugins must implement `SubscriberInterface`:
+All modern Joomla plugins must implement `SubscriberInterface`:
 
 ```php
 <?php

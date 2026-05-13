@@ -1,4 +1,4 @@
-# {{PROJECT_NAME}} - Joomla 5 Front-End Design Project
+# {{PROJECT_NAME}} - Joomla Front-End Design Project
 
 ## Project Configuration
 
@@ -20,7 +20,7 @@
 - **Template Overrides**: `E:\repositories\{{REPO_NAME}}\templates\{{TEMPLATE_NAME}}\html`
 - **Work Log**: `E:\repositories\{{REPO_NAME}}\Files\work-log.md`
 
-## Joomla 5 Template Structure
+## Joomla Template Structure
 
 ```
 templates/{{TEMPLATE_NAME}}/
@@ -144,7 +144,7 @@ $wa->usePreset('template.{{TEMPLATE_NAME}}');
 
 ## Template Entry Point (index.php)
 
-### Minimal Joomla 5 Template
+### Minimal Joomla Template
 
 ```php
 <?php

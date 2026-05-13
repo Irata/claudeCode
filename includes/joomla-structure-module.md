@@ -1,4 +1,4 @@
-## Joomla 5 Module Structure
+## Joomla Module Structure
 
 ### Module Directory and File Structure
 ```

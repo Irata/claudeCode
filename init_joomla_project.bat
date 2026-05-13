@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================================
-REM Joomla 5 Project Initialization Script
+REM Joomla Project Initialization Script
 REM
 REM This script automates new Joomla project setup:
 REM   1. Prompts for project details
@@ -32,14 +32,14 @@ if exist "!CLAUDECODE_DIR!\config.bat" (
 
 echo.
 echo ============================================
-echo   Joomla 5 Project Initialization
+echo   Joomla Project Initialization
 echo ============================================
 echo.
 
 REM --- Gather project information ---
 
 echo This script creates a new PHPStorm project with Claude Code support
-echo for Joomla 5 extension development. You will be prompted for details.
+echo for Joomla extension development. You will be prompted for details.
 echo.
 
 set /p PROJECT_NAME="PHPStorm Project Name (creates %PROJECTS_DIR%\<name>): "

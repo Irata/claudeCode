@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM ============================================================================
-REM Joomla 5 Front-End Design Project Initialization Script
+REM Joomla Front-End Design Project Initialization Script
 REM
 REM This script automates new Joomla front-end/template design project setup:
 REM   1. Prompts for project details (template name, CSS framework, build tool)
@@ -37,7 +37,7 @@ if exist "!CLAUDECODE_DIR!\config.bat" (
 
 echo.
 echo ============================================
-echo   Joomla 5 Front-End Design Project Setup
+echo   Joomla Front-End Design Project Setup
 echo ============================================
 echo.
 
@@ -637,8 +637,8 @@ REM Create language files
 set "PS_LANG=!TEMP!\joomla_frontend_lang.ps1"
 (
     echo param^(^)
-    echo $ini = "TPL_!TEMPLATE_NAME!=!TEMPLATE_NAME!`r`nTPL_!TEMPLATE_NAME!_XML_DESCRIPTION=!TEMPLATE_NAME! template for Joomla 5`r`nTPL_!TEMPLATE_NAME!_BASIC=Basic Settings`r`nTPL_!TEMPLATE_NAME!_LOGO=Logo`r`nTPL_!TEMPLATE_NAME!_LOGO_DESC=Select a logo image`r`nTPL_!TEMPLATE_NAME!_TAGLINE=Site Tagline`r`nTPL_!TEMPLATE_NAME!_TAGLINE_DESC=A short tagline displayed near the logo"
-    echo $sys = "TPL_!TEMPLATE_NAME!=!TEMPLATE_NAME!`r`nTPL_!TEMPLATE_NAME!_XML_DESCRIPTION=!TEMPLATE_NAME! template for Joomla 5"
+    echo $ini = "TPL_!TEMPLATE_NAME!=!TEMPLATE_NAME!`r`nTPL_!TEMPLATE_NAME!_XML_DESCRIPTION=!TEMPLATE_NAME! template for Joomla`r`nTPL_!TEMPLATE_NAME!_BASIC=Basic Settings`r`nTPL_!TEMPLATE_NAME!_LOGO=Logo`r`nTPL_!TEMPLATE_NAME!_LOGO_DESC=Select a logo image`r`nTPL_!TEMPLATE_NAME!_TAGLINE=Site Tagline`r`nTPL_!TEMPLATE_NAME!_TAGLINE_DESC=A short tagline displayed near the logo"
+    echo $sys = "TPL_!TEMPLATE_NAME!=!TEMPLATE_NAME!`r`nTPL_!TEMPLATE_NAME!_XML_DESCRIPTION=!TEMPLATE_NAME! template for Joomla"
     echo [System.IO.File]::WriteAllText^('!TPL_DIR!\language\en-GB\tpl_!TEMPLATE_NAME!.ini', $ini^)
     echo [System.IO.File]::WriteAllText^('!TPL_DIR!\language\en-GB\tpl_!TEMPLATE_NAME!.sys.ini', $sys^)
 ) > "!PS_LANG!"

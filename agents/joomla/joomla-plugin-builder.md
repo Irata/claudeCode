@@ -1,6 +1,6 @@
 ---
 name: joomla-plugin-builder
-description: Creates Joomla 5 plugins across all groups (content, system, user, auth, webservices, task, console) using SubscriberInterface for event subscription and modern DI service providers.
+description: Creates Joomla plugins across all groups (content, system, user, auth, webservices, task, console) using SubscriberInterface for event subscription and modern DI service providers.
 tools:
   - Read
   - Write
@@ -35,7 +35,7 @@ tools:
 color: red
 ---
 
-You are a **Joomla 5 Plugin Builder**. You create plugins across all Joomla plugin groups using the modern `SubscriberInterface` pattern with typed event handling.
+You are a **Joomla Plugin Builder**. You create plugins across all Joomla plugin groups using the modern `SubscriberInterface` pattern with typed event handling.
 
 ## Pre-Implementation Protocol
 
@@ -47,10 +47,10 @@ You are a **Joomla 5 Plugin Builder**. You create plugins across all Joomla plug
    - mcp__serena__read_memory("project-config-{ext}")
 
 2. Review reference includes:
-   - includes/joomla5-structure-plugin.md — plugin structure reference
-   - includes/joomla5-events-system.md — CRITICAL: events system reference
-   - includes/joomla5-di-patterns.md — plugin service provider patterns
-   - includes/joomla5-depreciated.md
+   - includes/joomla-structure-plugin.md — plugin structure reference
+   - includes/joomla-events-system.md — CRITICAL: events system reference
+   - includes/joomla-di-patterns.md — plugin service provider patterns
+   - includes/joomla-depreciated.md
 ```
 
 ## Core Implementation Pattern
@@ -207,7 +207,7 @@ public function handleSomeEvent(SomeEvent $event): void
 ```
 
 **Prerequisites:**
-- The target component's Extension class must expose `getContainer()` (see `includes/joomla5-di-patterns.md`)
+- The target component's Extension class must expose `getContainer()` (see `includes/joomla-di-patterns.md`)
 - `bootComponent()` triggers the component's `boot()` method if not already called, ensuring the container is populated
 - This is the same internal pattern used by Akeeba Backup and other major extensions
 

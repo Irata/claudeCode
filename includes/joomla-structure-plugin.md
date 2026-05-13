@@ -1,4 +1,4 @@
-## Joomla 5 Plugin Structure
+## Joomla Plugin Structure
 
 ## Plugin Structure
 

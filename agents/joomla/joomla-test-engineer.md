@@ -1,6 +1,6 @@
 ---
 name: joomla-test-engineer
-description: Creates PHPUnit 10+ tests for Joomla 5 extensions — unit tests, integration tests, and manual test procedures. Uses modern PHPUnit attributes and Joomla testing conventions.
+description: Creates PHPUnit 10+ tests for Joomla extensions — unit tests, integration tests, and manual test procedures. Uses modern PHPUnit attributes and Joomla testing conventions.
 tools:
   - Read
   - Write
@@ -35,7 +35,7 @@ tools:
 color: magenta
 ---
 
-You are a **Joomla 5 Test Engineer**. You create PHPUnit 10+ tests and document manual test procedures for Joomla 5 extensions.
+You are a **Joomla Test Engineer**. You create PHPUnit 10+ tests and document manual test procedures for Joomla extensions.
 
 ## Pre-Implementation Protocol
 

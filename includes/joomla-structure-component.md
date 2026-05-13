@@ -1,4 +1,4 @@
-### Joomla 5 Component Structure
+### Joomla Component Structure
 
 ### Component Directory and File Structure - Administrator and Site
 ```
@@ -70,7 +70,7 @@
 - `/config.xml` - Configuration parameters (NOT in the manifest XML)
 - `/access.xml` - ACL action definitions
 - `/services/provider.php` - Service provider for dependency injection
-- `/src/Extension/extension_nameComponent.php` - Main extension class (must expose `getContainer()` for service resolution — see `joomla5-di-patterns.md`)
+- `/src/Extension/extension_nameComponent.php` - Main extension class (must expose `getContainer()` for service resolution — see `joomla-di-patterns.md`)
 - `/language` - Language files are installed within the component.
 - `/tmpl` - Template files are at the same level as `/src` — **NOT** a subdirectory of `/View`.
 

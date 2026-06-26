@@ -175,6 +175,60 @@ protected function addToolbar(): void
 - The modern API returns a `Toolbar` object with a fluent interface supporting method chaining (e.g., `->listCheck(true)`, `->message(...)`)
 - `ToolbarHelper::title()` is exempt — it remains the correct way to set the page title and icon
 
+### `$response->code` on HTTP Responses (Does Not Exist)
+**Pattern**: Accessing `->code` property on the response from `HttpFactory::getHttp()`
+**Risk**: Fatal — property does not exist, causes an undefined property warning/error
+**Note**: `Joomla\Http\Response` extends `Laminas\Diactoros\Response` which implements PSR-7 `ResponseInterface`. PSR-7 has no public `$code` property — only the `getStatusCode()` method.
+
+#### Detection Pattern
+```php
+// WRONG — no public $code property on PSR-7 Response
+$http = HttpFactory::getHttp();
+$response = $http->post($url, $body, $headers);
+$code = $response->code;
+```
+
+#### Recommended Migration
+```php
+// CORRECT — use the PSR-7 getStatusCode() method
+$http = HttpFactory::getHttp();
+$response = $http->post($url, $body, $headers);
+$code = $response->getStatusCode();
+```
+
+#### Why This Matters
+- Older Joomla HTTP libraries (Joomla 3.x era) exposed `$response->code` as a public property
+- Since Joomla 4.0+, the HTTP layer uses `Laminas\Diactoros\Response` (PSR-7 compliant)
+- PSR-7 `ResponseInterface` defines `getStatusCode(): int` — there is no `$code` property
+- Similarly, the response body is accessed via `$response->getBody()->__toString()` or `(string) $response->getBody()`, not `$response->body`
+
+### `getInstance()` on Joomla Framework Classes (Does Not Exist)
+**Pattern**: Calling `getInstance()` on Joomla Framework classes (under `Joomla\Filter\`, `Joomla\Input\`, etc.)
+**Risk**: Fatal — method does not exist on the framework class, causing a runtime error
+**Note**: The old CMS wrapper classes (e.g., `Joomla\CMS\Filter\InputFilter`) had `getInstance()`, but the framework-level classes never did. When using the framework `InputFilter` import (`use Joomla\Filter\InputFilter`), `getInstance()` will fail.
+
+#### Detection Pattern
+```php
+// WRONG — getInstance() does not exist on Joomla\Filter\InputFilter
+use Joomla\Filter\InputFilter;
+
+$filter = InputFilter::getInstance($allowedTags, $allowedAttributes, InputFilter::ONLY_ALLOW_DEFINED_TAGS, InputFilter::ONLY_ALLOW_DEFINED_ATTRIBUTES);
+```
+
+#### Recommended Migration
+```php
+// CORRECT — use the constructor directly
+use Joomla\Filter\InputFilter;
+
+$filter = new InputFilter($allowedTags, $allowedAttributes, InputFilter::ONLY_ALLOW_DEFINED_TAGS, InputFilter::ONLY_ALLOW_DEFINED_ATTRIBUTES);
+```
+
+#### Why This Matters
+- `Joomla\Filter\InputFilter` (the framework class) has a public constructor but no static `getInstance()` factory
+- Code that imports the framework class and calls `::getInstance()` will fail at runtime with "Call to undefined method"
+- This applies broadly: Joomla Framework 2.0+ classes use constructors, not static factories
+- Always check which `InputFilter` is imported — `Joomla\Filter\InputFilter` (framework) vs `Joomla\CMS\Filter\InputFilter` (CMS wrapper)
+
 ### View Model Access Pattern (Deprecated in 5.3.0)
 **Pattern**: Using `$this->get('PropertyName')` in Joomla view classes to access model data
 **Deprecation Version**: 5.3.0

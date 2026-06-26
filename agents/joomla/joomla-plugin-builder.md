@@ -1,6 +1,6 @@
 ---
 name: joomla-plugin-builder
-description: Creates Joomla plugins across all groups (content, system, user, auth, webservices, task, console) using SubscriberInterface for event subscription and modern DI service providers.
+description: Use when building Joomla plugins in the content, system, user, auth, task, or console groups using SubscriberInterface and modern DI service providers. For the webservices plugin that registers API routes, use joomla-api-builder; for CLI console commands, use joomla-cli-builder.
 tools:
   - Read
   - Write

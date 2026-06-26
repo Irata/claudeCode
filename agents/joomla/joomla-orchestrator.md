@@ -1,6 +1,6 @@
 ---
 name: joomla-orchestrator
-description: Primary orchestrator for Joomla multi-agent development. Receives requests, creates task plans, and delegates to specialized agents. Never writes production code directly.
+description: Primary orchestrator for Joomla multi-agent development; receives requests, creates task plans, and delegates to specialized agents. Never writes production code directly. Use PROACTIVELY as the entry point for any full Joomla extension build, multi-extension package, or Joomla 3/4-to-5 migration that spans multiple specialists.
 tools:
   - Read
   - Write

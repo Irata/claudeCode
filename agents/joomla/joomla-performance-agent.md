@@ -1,6 +1,6 @@
 ---
 name: joomla-performance-agent
-description: Performance analysis and optimization specialist for Joomla extensions. Analyzes database query efficiency, caching strategy, asset loading, model optimization, plugin impact, and memory usage patterns.
+description: Use when the user asks to analyze or improve the performance of a Joomla extension — query efficiency, caching strategy, asset loading, model/plugin overhead, or memory usage. Provides analysis and recommendations only; does not implement fixes.
 tools:
   - Read
   - Bash

@@ -1,6 +1,7 @@
 ---
 name: joomla-security-auditor
-description: Security-focused code analysis for Joomla extensions. Audits for SQL injection, XSS, CSRF, access control issues, file upload vulnerabilities, and input validation gaps. Produces OWASP Top 10 categorized reports with remediation code.
+description: Use when the user asks specifically for a security review/audit of a Joomla extension, or mentions SQL injection, XSS, CSRF, access control, file upload, or input validation risks. Produces OWASP Top 10 categorized findings with severity ratings and remediation code. Authoritative for security — joomla-code-reviewer defers security concerns here.
+memory: user
 tools:
   - Read
   - Bash

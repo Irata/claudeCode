@@ -1,6 +1,6 @@
 ---
 name: joomla-api-builder
-description: Implements Joomla Web Services API endpoints with JSON:API compliance, plus companion webservices plugins for route registration. Follows RESTful conventions with proper auth, pagination, and field filtering.
+description: Use when building Joomla Web Services API endpoints (JSON:API controllers, views, serializers) for a component, plus the companion webservices plugin that registers those API routes. Handles auth, pagination, and field filtering. For non-API plugin groups, use joomla-plugin-builder.
 tools:
   - Read
   - Write
@@ -574,16 +574,58 @@ GET /api/index.php/v1/example/items?page[offset]=0&page[limit]=20
 ```
 GET /api/index.php/v1/example/items?fields[items]=id,title,state
 ```
+> Caveat: core `JsonApiView::displayList()` forces output to its own
+> `$fieldsToRenderList` and does **not** honour a client-supplied `fields[type]`
+> sparse fieldset for slimming the list payload. To guarantee a reduced/no-PII
+> field set, render through a purpose-built slim view (see the pattern below).
 
 ### Filtering
 ```
 GET /api/index.php/v1/example/items?filter[state]=1&filter[search]=keyword
 ```
 
+### Purpose-Built List Endpoints (custom action → state → parent displayList → slim view)
+
+Preferred pattern for specialised list/search endpoints (type-ahead, autocomplete,
+constrained sub-lists) — no new model, no duplicated query logic:
+
+1. Add a custom action on the existing API controller.
+2. Validate input; throw `Joomla\CMS\MVC\Controller\Exception\Save($msg, 404)` for a
+   404 **with** a message (core's `RouteNotFoundException` handler discards the message;
+   a bare `\InvalidArgumentException` renders as 500).
+3. Seed model state with the same builder the normal `displayList()` uses, then add the
+   endpoint-specific filter(s).
+4. Set `$this->default_view` to a slim purpose-built view; **keep `$this->contentType`
+   unchanged** so the existing list model and JSON:API resource `type` are reused
+   (`displayList()` resolves the view from `default_view` and the model from `contentType`).
+5. Call `parent::displayList()`.
+
+Back the new filter with an index-friendly prefix match (`LIKE 'term%'`) and add a
+column index for large tables. Full worked example and rationale:
+`includes/joomla-structure-api.md` → "Purpose-Built List Endpoint Pattern".
+
 ### Authentication
 - Token-based authentication via `X-Joomla-Token` header
 - API tokens managed through Joomla user profile
 - ACL checks apply to all API operations
+
+### Error Responses (exception → HTTP status & message)
+
+The API renders thrown exceptions through **type-specific** JSON:API handlers; the
+exception class you throw decides the status code **and** whether your message is shown.
+Key rules:
+- `RouteNotFoundException` / `ResourceNotFound` → **404 but hardcoded "Resource not
+  found"** (your message is discarded). `NotAllowed` → 403 "Access Denied" (also hardcoded).
+- To return a **404 with a custom message**, throw
+  `Joomla\CMS\MVC\Controller\Exception\Save($message, 404)` — its handler uses
+  `getCode()` for the status and renders the message as the error title.
+- **400 with a message** → `Tobscure\JsonApi\Exception\InvalidParameterException` or
+  `Save($message, 400)`.
+- **Never** throw a bare `\InvalidArgumentException` / `\RuntimeException` expecting a
+  status — unrecognised exceptions render as a **generic 500**.
+
+Full mapping table and recipes: `includes/joomla-structure-api.md` → "JSON:API Error
+Responses (Exceptions → HTTP status & message)".
 
 ## Standards
 

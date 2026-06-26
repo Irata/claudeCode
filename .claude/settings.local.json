@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Write-Output \"=== All 'claude' in PATH \\(in order\\) ===\"; where.exe claude 2>$null; Write-Output \"\"; Write-Output \"=== Env CLAUDECODE / which exe is this session ===\"; Write-Output \"CLAUDE_CODE path env: $env:CLAUDE_CODE_ENTRYPOINT\")"
+    ]
+  }
+}

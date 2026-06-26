@@ -844,6 +844,8 @@ All three must use the same V.R.M value when a new update file is created.
 
 **Reset rules:** Incrementing **V** resets R and M to `0`. Incrementing **R** resets M to `0`.
 
+**PHPDoc `@since` tags:** Tag new/changed symbols with the owning extension's current manifest `<version>` — read the manifest, never guess or copy the highest `@since` already in the codebase (existing tags may have drifted). Code spanning multiple extensions uses each extension's own manifest version for its files.
+
 **Standard Joomla system fields for core/CRUD tables** (tables where users create, edit, delete records):
 
 ```sql
@@ -919,6 +921,38 @@ $icon = match($item->published) {
 
 // Typed class constants
 public const string CONTEXT = 'com_example.item';
+```
+
+## Framework Class Instantiation
+
+Joomla Framework 2.0+ classes (`Joomla\Filter\*`, `Joomla\Input\*`, etc.) use constructors — they do NOT have `getInstance()` static factories:
+
+```php
+// WRONG — getInstance() does not exist on Joomla\Filter\InputFilter
+use Joomla\Filter\InputFilter;
+$filter = InputFilter::getInstance($tags, $attrs, InputFilter::ONLY_ALLOW_DEFINED_TAGS, InputFilter::ONLY_ALLOW_DEFINED_ATTRIBUTES);
+
+// CORRECT — use the constructor
+$filter = new InputFilter($tags, $attrs, InputFilter::ONLY_ALLOW_DEFINED_TAGS, InputFilter::ONLY_ALLOW_DEFINED_ATTRIBUTES);
+```
+
+This applies to all Joomla Framework classes. Always check the class API — if the `use` import points to `Joomla\Filter\*` (framework) rather than `Joomla\CMS\Filter\*` (CMS wrapper), use `new`.
+
+## HTTP Response — PSR-7 API
+
+`HttpFactory::getHttp()` returns responses implementing PSR-7 (`Joomla\Http\Response` extends `Laminas\Diactoros\Response`). Use PSR-7 methods, not legacy property access:
+
+```php
+$http = HttpFactory::getHttp();
+$response = $http->post($url, $body, $headers);
+
+// WRONG — no public $code or $body properties
+$code = $response->code;
+$body = $response->body;
+
+// CORRECT — PSR-7 methods
+$code = $response->getStatusCode();
+$body = (string) $response->getBody();
 ```
 
 ## Database Query Standards

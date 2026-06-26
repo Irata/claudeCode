@@ -98,10 +98,17 @@ find "{Repository}" \
 For each date with modifications:
 
 1. **Read the modified files** (or at least examine their paths and key content) to understand what changed
-2. **Group by functional area** — e.g. "Admin UI", "API Layer", "Schema Updates", "Documentation", "Build/Packaging"
-3. **Determine the focus** — write a one-line summary of the day's primary focus
-4. **List files changed** — compile a summary file list (not every single file, but the key ones)
-5. **Write the "In short" summary** — 1-2 sentences capturing the essence of the day
+2. **Use local git log for context** — when using `git log` to understand commits, **always filter to only the local user's commits**:
+   ```bash
+   git -C "{Repository}" log --author="$(git -C '{Repository}' config user.name)" \
+     --after="YYYY-MM-DD 00:00:00" --before="YYYY-MM-DD+1 00:00:00" \
+     --oneline --stat
+   ```
+   Do NOT use unfiltered `git log` — it will include commits from other contributors that were merged into the branch, which are not the local user's work. Only report on work done by the configured `user.name`.
+3. **Group by functional area** — e.g. "Admin UI", "API Layer", "Schema Updates", "Documentation", "Build/Packaging"
+4. **Determine the focus** — write a one-line summary of the day's primary focus
+5. **List files changed** — compile a summary file list (not every single file, but the key ones)
+6. **Write the "In short" summary** — 1-2 sentences capturing the essence of the day
 
 ### 6. Verify Day Names
 

@@ -24,7 +24,7 @@ If no argument is provided, ask the user which level to bump.
 This skill works in tandem with the **SQL Update File Management** convention documented in `joomla-coding-preferences.md`. During development, agents create and append to an unstaged SQL update file whenever schema changes are needed. By the time this skill runs, one of two situations exists:
 
 1. **An unstaged SQL file already exists** in `sql/updates/mysql/` — created during development when schema changes were written. This file needs to be reconciled with the final version number.
-2. **No unstaged SQL file exists** — no schema changes were made during this development cycle. A new empty SQL file is created as a version marker.
+2. **No unstaged SQL file exists** — no schema changes were made during this development cycle. A new SQL file is created as a version marker, containing basic placeholder comment content (never left truly empty — a zero-byte SQL file can cause problems for tooling and is ambiguous in review).
 
 ## Steps
 
@@ -58,7 +58,11 @@ This skill works in tandem with the **SQL Update File Management** convention do
    - Report the rename to the user (e.g. "Renamed 2.4.3.sql → 2.5.0.sql")
 
    **If no unstaged SQL file exists:**
-   - Create an empty file named `{new-version}.sql` in the SQL updates directory
+   - Create a file named `{new-version}.sql` in the SQL updates directory containing basic placeholder comment content — **do not create a zero-byte/empty file**. Use two SQL comment lines: one identifying the extension and version, one stating there are no schema changes. For example:
+     ```sql
+     -- com_forum schema update {new-version}
+     -- No schema changes in this release.
+     ```
    - If a file with this name already exists and is committed, warn the user — this version has already been released
 
 6. **Update the remaining files** (must stay in sync with the SQL file):
@@ -70,5 +74,5 @@ This skill works in tandem with the **SQL Update File Management** convention do
    - Old version → New version
    - List all files created, renamed, or modified
    - If the SQL file was renamed, show the old and new filenames
-   - If the SQL file contains content (schema changes), remind the user to review it
-   - If the SQL file is empty, remind the user to add any required ALTER TABLE statements if database changes are included in this release
+   - If the SQL file contains schema changes, remind the user to review it
+   - If the SQL file is just the placeholder marker, remind the user to add any required ALTER TABLE statements if database changes are included in this release

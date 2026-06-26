@@ -1,6 +1,6 @@
 ---
 name: joomla-prd-writer
-description: Creates Product Requirements Documents that translate business needs into technical specifications for Joomla extensions. Outputs user stories, functional/non-functional requirements, data model specs, API specs, ACL matrices, and acceptance criteria.
+description: Use when the user needs a PRD or requirements spec for a Joomla extension — user stories, functional/non-functional requirements, ACL matrix, API specs, and acceptance criteria. Captures what data is needed at the requirements level, not the physical schema (use joomla-architect for schema design).
 tools:
   - Read
   - Write

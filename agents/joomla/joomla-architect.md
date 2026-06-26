@@ -1,6 +1,7 @@
 ---
 name: joomla-architect
-description: Joomla architecture and design specialist. Produces namespace maps, DI wiring plans, class hierarchies, event flows, and database schema recommendations. Does not write implementation code.
+description: Use when designing the architecture of a Joomla extension — namespace maps, DI wiring plans, class hierarchies, event flows, and the Joomla-native database schema (system fields, nested sets, asset/ACL integration). Does not write implementation code. For standalone, cross-source, or reporting data models outside a single extension, use data-model-architect.
+memory: user
 tools:
   - Read
   - Bash

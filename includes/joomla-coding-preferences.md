@@ -53,10 +53,25 @@
 | Events | `DispatcherInterface` + `EventInterface` | Custom observer pattern |
 | Logging | `Log::add()` | `error_log()`, `file_put_contents()` |
 | HTTP client | `HttpFactory::getHttp()` | `curl_*()`, `file_get_contents()` |
+| HTTP response code | `$response->getStatusCode()` | `$response->code` |
+| Input filter | `new InputFilter(...)` | `InputFilter::getInstance(...)` |
 | Pagination | `Pagination` class in ListModel | Custom pagination |
 | Form handling | `Form` class with XML definitions | Manual HTML forms |
 | Access control | `$user->authorise()` | Custom permission checks |
 | Categories | `CategoriesServiceInterface` | Custom category trees |
+
+### HTTP Response — PSR-7 `getStatusCode()`, Not `->code`
+- `HttpFactory::getHttp()->post()` / `->get()` returns `Joomla\Http\Response` which extends `Laminas\Diactoros\Response` (PSR-7)
+- PSR-7 responses expose the status code via `getStatusCode()` — there is **no public `$code` property**
+- **Always use `$response->getStatusCode()`**, never `$response->code`
+- The body is accessed via `$response->getBody()->__toString()` or `(string) $response->getBody()`
+
+### Framework Class Instantiation — No `getInstance()`
+- Joomla Framework 2.0+ classes (under `Joomla\Filter\`, `Joomla\Input\`, etc.) use plain constructors — they do NOT have `getInstance()` static factory methods
+- The old CMS wrapper classes (e.g., `Joomla\CMS\Filter\InputFilter`) had `getInstance()`, but the framework classes do not
+- **Always use `new ClassName(...)` for Joomla Framework classes**, never `ClassName::getInstance()`
+- Common mistake: `InputFilter::getInstance($tags, $attrs, ...)` — correct: `new InputFilter($tags, $attrs, ...)`
+- This applies to all `Joomla\Filter\*`, `Joomla\Input\*`, and similar framework-level classes
 
 ### Design Patterns
 - Do NOT use the Repository design pattern in Joomla extensions. Use Joomla's native Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) for all data access.
@@ -122,6 +137,17 @@ $db->setQuery($query)->execute();
 
 **Models MAY use raw SQL for SELECT queries** (read operations) — this is normal for building list queries in `getListQuery()`. The rule is: **reads via query builder, writes via Table**.
 
+**Documented exceptions (bulk import / migration only).** Two cases warrant a deliberate,
+commented deviation, covered in full in `joomla-chunked-import-pattern.md`:
+1. **Explicit-PK inserts** — when preserving a source system's IDs as primary keys, override the
+   Table's `store()` so it still runs `bind()`/`check()` validation but writes via
+   `$db->insertObject()` (Joomla's `store()` mis-routes a pre-assigned PK to a 0-row UPDATE).
+2. **Set-based / atomic writes** — bulk moves, atomic counter increments, and aggregate rebuilds
+   that have no single owning row may use raw `->update()` in the DataModel. Annotate each with a
+   `Direct SQL exception: <reason>` comment and always parameter-bind.
+
+These are exceptions, not a general license — ordinary per-record writes still go through `store()`.
+
 ### Manifest XML Naming
 - Component manifest files MUST be named `{name}.xml` (e.g. `forum.xml`, `community.xml`), **NOT** `com_{name}.xml`.
 - The manifest lives inside the admin folder: `admin/com_{name}/{name}.xml`.
@@ -152,6 +178,15 @@ $db->setQuery($query)->execute();
   2. **Manifest XML**: `<version>` element in `admin/com_{name}/{name}.xml`
   3. **Phing build file**: `version` property in `Phing/com_{name}.xml`
 - **When bumping the version**, also review the `<creationDate>` element in the manifest XML and update it to the current date (e.g. `<creationDate>yyyy-mm-dd</creationDate>`) if it does not reflect the current date
+
+### PHPDoc `@since` Tags — Track the Manifest Version
+- **New or changed code MUST be tagged with the owning extension's current manifest `<version>`.** Do **not** guess a value or copy the highest `@since` already present in the codebase — existing tags may have drifted out of step with the manifest.
+- **Read the manifest before writing the tag**:
+  - Component code → `admin/com_{name}/{name}.xml` `<version>`
+  - Plugin code → that plugin's manifest `<version>` (e.g. `plugins/{group}/{name}/{name}.xml`)
+  - Module code → that module's manifest `<version>`
+- A change that spans more than one extension uses **each extension's own** manifest version for its respective files (e.g. plugin source = plugin manifest version; the component table/SQL it touches = component manifest version).
+- Because `@since` tracks the manifest, it advances in lockstep with the V.R.M bump above: when a change warrants a version bump, new symbols added in that change carry the new version; pre-existing symbols keep their original `@since`.
 
 ### SQL Update File Management
 

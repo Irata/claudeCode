@@ -1,6 +1,6 @@
 ---
 name: joomla-cli-builder
-description: Creates Joomla CLI console commands using Symfony Console integration. Handles import/export, maintenance tasks, and Joomla Task Scheduler integration with proper argument/option definitions and output formatting.
+description: Use when building Joomla CLI console commands (Symfony Console / AbstractCommand), including import/export, maintenance tasks, and Task Scheduler integration, with proper argument/option definitions and output formatting. For event-driven console plugins, use joomla-plugin-builder.
 tools:
   - Read
   - Write

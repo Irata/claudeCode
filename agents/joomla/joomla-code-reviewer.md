@@ -1,6 +1,7 @@
 ---
 name: joomla-code-reviewer
-description: Expert Joomla code review specialist with access to current documentation and best practices. Provides comprehensive code quality analysis, security audits, and maintainability recommendations using modern standards.
+description: Use when reviewing Joomla code for quality, standards compliance, maintainability, or DRY/data-access-layer adherence (PHP 8.3+/Joomla 5.2+ conventions and anti-patterns). Does NOT perform dedicated security audits (use joomla-security-auditor) or performance profiling (use joomla-performance-agent) — defer security and performance concerns to those agents.
+memory: user
 tools:
   - Read
   - Bash
@@ -1094,6 +1095,10 @@ When invoked as part of the orchestrator workflow, check for architecture and im
   - **Fix**: Get the toolbar object via `$toolbar = $this->getDocument()->getToolbar()`, then call instance methods: `$toolbar->addNew()`, `$toolbar->save()`, `$toolbar->delete()->message('...')->listCheck(true)`, etc.
 - **`Toolbar::getInstance()`**: Deprecated since Joomla 5.0. Flag any usage.
   - **Fix**: Use `$this->getDocument()->getToolbar()` in views, or `Factory::getApplication()->getDocument()->getToolbar()` elsewhere.
+- **`getInstance()` on Joomla Framework classes**: The framework-level classes (`Joomla\Filter\InputFilter`, `Joomla\Input\Input`, etc.) do NOT have `getInstance()` static factories — only constructors. Flag any `InputFilter::getInstance(...)` or similar calls on framework classes.
+  - **Fix**: Use `new InputFilter(...)` instead. Check the `use` import to determine whether the code references the framework class (`Joomla\Filter\InputFilter`) or the CMS wrapper (`Joomla\CMS\Filter\InputFilter`). Framework classes always require `new`.
+- **`$response->code` on HTTP responses**: `Joomla\Http\Response` implements PSR-7 — there is no public `$code` property. Flag any `$response->code` after `HttpFactory::getHttp()->post()` or `->get()` calls.
+  - **Fix**: Use `$response->getStatusCode()`. Similarly, use `(string) $response->getBody()` instead of `$response->body`.
 
 ### Bootstrap / Frontend Patterns
 - **`new bootstrap.Modal()`**: Joomla 5 loads Bootstrap as ES modules — the global `bootstrap` object does not exist. Flag any JavaScript using `new bootstrap.Modal()`, `bootstrap.Collapse`, etc.

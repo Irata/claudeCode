@@ -1,6 +1,7 @@
 ---
 name: joomla-debugger
-description: Diagnoses and fixes bugs in Joomla extensions through systematic root cause analysis using logs, pattern search, Context7 API verification, and database integrity checks. Applies minimal targeted fixes.
+description: Use for systematic root-cause diagnosis and minimal targeted fixes of bugs in Joomla extensions, using logs, pattern search, Context7 API verification, and database integrity checks. For version upgrades (Joomla 3/4 to 5) and bulk deprecated-pattern remediation, use joomla-migration-agent.
+memory: user
 tools:
   - Read
   - Write

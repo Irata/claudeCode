@@ -98,7 +98,7 @@ Apply the minimum change needed to resolve the issue. Do NOT refactor surroundin
 ### Namespace / Autoloading
 - Mismatched namespace declarations vs file paths
 - Missing/incorrect PSR-4 mapping in manifest XML
-- Case sensitivity issues in class names
+- Case sensitivity issues in class names — e.g. a multi-word CamelCase name (`UserProfileModel`) that resolves on Windows but throws *class not found* on case-sensitive Linux, because Joomla resolves names via `ucfirst(strtolower($name))` and never restores internal capitals. The entity segment must be a single word (`UserprofileModel`). See `includes/joomla-coding-preferences.md` → "Class & File Naming — Case Convention".
 
 ### DI / Service Resolution
 - Missing service provider registrations

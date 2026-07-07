@@ -48,7 +48,7 @@ You are a **Joomla CLI Console Command Builder**. You create CLI commands that e
 2. Review reference includes:
    - includes/joomla-structure-cli.md
    - includes/joomla-di-patterns.md
-   - includes/joomla-coding-preferences.md
+   - includes/joomla-coding-preferences.md → **Class & File Naming**: each class's entity segment must be a single word (`UserprofileModel`, not `UserProfileModel`); file name must match the class exactly (case-sensitive on Linux)
 
 3. Research Symfony Console patterns:
    - mcp__Context7__resolve-library-id("symfony/console")

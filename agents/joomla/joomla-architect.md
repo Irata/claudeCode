@@ -537,6 +537,8 @@ Design the complete namespace hierarchy:
 Store: mcp__serena__write_memory("architecture-{ext}-namespace-map", ...)
 ```
 
+**Naming rule (Joomla case convention):** every class's *entity* segment must be a single word — one leading capital, all other letters lowercase — with the type suffix in normal casing (`UserprofileModel`, `SpacepartnerService`, `View/Reviewaction/HtmlView`; **not** `UserProfileModel`, `SpacePartnerService`, `View/ReviewAction/HtmlView`). Multi-word entities collapse to one lowercase-after-first token. This is stricter than PSR-1 StudlyCaps and is mandatory because Joomla resolves names via `ucfirst(strtolower())` (multi-word names break on case-sensitive Linux). Bake compliant names into the namespace map and class hierarchy so builders inherit them. See `includes/joomla-coding-preferences.md` → "Class & File Naming — Case Convention".
+
 **Key principle**: All domain/business logic services live in `Administrator\Service\` and are injected into all contexts via DI.
 
 

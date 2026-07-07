@@ -10,20 +10,21 @@
 
 | Agent | Description |
 |-------|-------------|
-| `joomla-admin-builder` | Implements the administrator/backend side of Joomla components |
-| `joomla-api-builder` | Implements Joomla Web Services API endpoints with JSON:API compliance |
-| `joomla-architect` | Joomla architecture and design specialist |
-| `joomla-build-agent` | Manages Phing build files, extension packaging, version management, and update server XML generation |
-| `joomla-cli-builder` | Creates Joomla CLI console commands using Symfony Console integration |
-| `joomla-code-reviewer` | Expert Joomla code review specialist with access to current documentation and best practices |
-| `joomla-debugger` | Diagnoses and fixes bugs in Joomla extensions through systematic root cause analysis |
+| `joomla-admin-builder` | Implements the administrator/backend side of Joomla components — controllers, models, views, tables, forms XML, toolbar, ACL, config.xml, and service providers using PHP 8.3+ and modern Joomla patterns |
+| `joomla-api-builder` | Use when building Joomla Web Services API endpoints (JSON:API controllers, views, serializers) for a component, plus the companion webservices plugin that registers those API routes |
+| `joomla-architect` | Use when designing the architecture of a Joomla extension — namespace maps, DI wiring plans, class hierarchies, event flows, and the Joomla-native database schema (system fields, nested sets, asset/ACL integration) |
+| `joomla-build-agent` | Manages Phing build files, extension packaging, version management, update server XML generation, and multi-extension package manifests for Joomla extensions |
+| `joomla-cli-builder` | Use when building Joomla CLI console commands (Symfony Console / AbstractCommand), including import/export, maintenance tasks, and Task Scheduler integration, with proper argument/option definitions and output formatting |
+| `joomla-code-reviewer` | Use when reviewing Joomla code for quality, standards compliance, maintainability, or DRY/data-access-layer adherence (PHP 8.3+/Joomla 5.2+ conventions and anti-patterns) |
+| `joomla-debugger` | Use for systematic root-cause diagnosis and minimal targeted fixes of bugs in Joomla extensions, using logs, pattern search, Context7 API verification, and database integrity checks |
 | `joomla-language-manager` | Manages all .ini/.sys.ini language files for Joomla extensions |
-| `joomla-migration-agent` | Upgrades Joomla 3/4 extensions to modern Joomla |
-| `joomla-module-builder` | Creates Joomla modules (site and admin) using the modern dispatcher pattern |
-| `joomla-orchestrator` | Primary orchestrator for Joomla multi-agent development |
-| `joomla-performance-agent` | Performance analysis and optimization specialist for Joomla extensions |
-| `joomla-plugin-builder` | Creates Joomla plugins across all groups using SubscriberInterface |
-| `joomla-prd-writer` | Creates Product Requirements Documents that translate business needs into technical specifications |
-| `joomla-security-auditor` | Security-focused code analysis for Joomla extensions |
-| `joomla-site-builder` | Implements the site/frontend side of Joomla components |
-| `joomla-test-engineer` | Creates PHPUnit 10+ tests for Joomla extensions |
+| `joomla-less-builder` | Scaffolds and builds a LESS → CSS stylesheet structure for a Joomla component's media folder (shared/base/components/imports layering), compiles via the PhpStorm LESS File Watcher (or lessc), and registers the compiled CSS in joomla.asset.json for the Web Asset Manager |
+| `joomla-migration-agent` | Upgrades Joomla 3/4 extensions to Joomla 5 |
+| `joomla-module-builder` | Creates Joomla modules (site and admin) using the modern dispatcher pattern with ModuleDispatcherFactory, HelperFactory, and proper service provider registration |
+| `joomla-orchestrator` | Primary orchestrator for Joomla multi-agent development; receives requests, creates task plans, and delegates to specialized agents |
+| `joomla-performance-agent` | Use when the user asks to analyze or improve the performance of a Joomla extension — query efficiency, caching strategy, asset loading, model/plugin overhead, or memory usage |
+| `joomla-plugin-builder` | Use when building Joomla plugins in the content, system, user, auth, task, or console groups using SubscriberInterface and modern DI service providers |
+| `joomla-prd-writer` | Use when the user needs a PRD or requirements spec for a Joomla extension — user stories, functional/non-functional requirements, ACL matrix, API specs, and acceptance criteria |
+| `joomla-security-auditor` | Use when the user asks specifically for a security review/audit of a Joomla extension, or mentions SQL injection, XSS, CSRF, access control, file upload, or input validation risks |
+| `joomla-site-builder` | Implements the site/frontend side of Joomla components — controllers, models, views, templates, SEF router, menu item types, and Web Asset Manager integration using PHP 8.3+ patterns |
+| `joomla-test-engineer` | Creates PHPUnit 10+ tests for Joomla extensions — unit tests, integration tests, and manual test procedures |

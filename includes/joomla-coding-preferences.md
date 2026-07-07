@@ -10,6 +10,32 @@
 - All namespacing at the top of each file should be in alphabetical order for any Joomla task/project
 - All component Classes namespaced under _vendor_\_name_ 
 - 
+### Class & File Naming — Case Convention (Joomla `ucfirst` Resolution)
+
+**Rule:** In every class name the **entity segment must be a single word** — one leading uppercase letter, all remaining letters lowercase. Recognised Joomla **type suffixes** keep their normal casing. A file name **must match its class name exactly** (PSR-4).
+
+```text
+✅ UserprofileModel             ❌ UserProfileModel
+✅ ReviewactionTable            ❌ ReviewActionTable
+✅ View/Spacepartner/HtmlView   ❌ View/SpacePartner/HtmlView
+✅ PartnerexportimportService   ❌ PartnerExportImportService
+✅ Publicationstate (enum)      ❌ PublicationState
+```
+
+**Recognised type suffixes** (retain PascalCase): `Controller`, `Model`, `DataModel`, `View` / `HtmlView`, `Table`, `Service`, `Field`, `Helper`, `Dispatcher`. Everything before the suffix is the entity segment and must be one word. Classes with **no** recognised suffix (Enums, value objects such as `ImportResult`) are treated as all-entity and must also be a single word.
+
+**Why this exists.** Joomla resolves MVC and form-field names from request/config strings via effectively `ucfirst(strtolower($name))` — it capitalises **only the first letter** and never restores internal capitals. So `&view=userprofile` resolves to class `Userprofile…`; a class named `UserProfile…` is never produced by the resolver. Because `createModel()` / `createTable()` / `getModel()` already lowercase-then-`ucfirst` the name they are handed, the names passed to them are kept all-lowercase — which is exactly why the target class can only ever be a single capitalised word.
+
+**Why it hides on Windows and breaks on Linux.** PSR-4 autoloading maps the class name to a file path. On case-**insensitive** filesystems (Windows, default macOS) `UserProfileModel.php` is still found when the resolver asks for `Userprofilemodel.php`, so the bug is invisible during local development. On case-**sensitive** filesystems (Linux) the lookup fails with a fatal *class not found*. Code that runs fine on a Windows dev machine breaks on a Linux server.
+
+**Relationship to PSR.** PSR-1/PSR-12 mandate `StudlyCaps` class names, which would *permit* multi-word `UserProfile`. This Joomla convention is **stricter** — it narrows the entity segment to a single word — and wins wherever the two differ for name-resolved classes. PSR-4 (autoloading) is what makes the case mismatch fatal on Linux; PSR-12 (formatting) is orthogonal and unaffected.
+
+**Risk tiers.**
+- **Breaks at runtime on Linux** — classes resolved *by name*: `Controller`, `Model`, `View` folder, `Table`, form `Field`. Multi-word names here are functional bugs.
+- **Convention-only (works today, still non-compliant)** — classes resolved *by explicit FQCN* via DI / `provider.php`: `Service`, `DataModel`, `Enum`, value objects, `Helper`. These must still be single-word for consistency.
+
+**Multi-word entities** collapse to one lowercase-after-first token: `UserProfile → Userprofile`, `SpacePartner → Spacepartner`, `AuditLog → Auditlog`, `IncidentType → Incidenttype`, `ExportPartners → Exportpartners`. Only folders that contain **classes** (`Controller/`, `Model/`, `Table/`, `View/<Entity>/`, `Service/`, `Field/`, `Enum/`, `Helper/`) follow this case convention — non-class folders (`tmpl/`, `forms/`, `language/`, `media/`) are already all-lowercase and are correct as-is.
+
 - ### Code Standards
 - PHP 8.3+ language features (constructor promotion, readonly properties, enums, match expressions, typed class constants, `#[Override]` attribute)
 - Modern PSR-4 autoloading with Joomla namespaced classes
@@ -274,6 +300,22 @@ Existing committed files: 2.4.0.sql, 2.4.1.sql, 2.4.2.sql
       }
   }
   ```
+- **Never pass an expression or function-call result directly to `bind()`.** Because the value is taken by reference, only a variable is a legal argument. Passing `trim($name)`, `(int) $id`, `$a . $b`, a ternary, or any other expression triggers PHP's **"Only variables can be passed by reference"** error (the IDE flags it too). Assign the computed value to a variable first, then bind the variable:
+  ```php
+  // WRONG — trim() returns a value, not a variable → "Only variables can be passed by reference"
+  if (is_string($name) && trim($name) !== '') {
+      $query->where($db->quoteName('a.name') . ' = :name')
+          ->bind(':name', trim($name), ParameterType::STRING);
+  }
+
+  // CORRECT — compute into a variable, then bind that variable
+  $name = trim((string) $name);
+  if ($name !== '') {
+      $query->where($db->quoteName('a.name') . ' = :name')
+          ->bind(':name', $name, ParameterType::STRING);
+  }
+  ```
+  This applies to every `bind()` argument — casts, concatenations, method calls, and ternaries must all be resolved into a variable before the `bind()` call.
 
 ### SQL Filter Fields — Exclude NULL Values
 - SQL-type filter fields in form XML (`type="sql"`) that use `SELECT DISTINCT` can return `NULL` values from the database

@@ -49,7 +49,7 @@ You are a **Joomla Module Builder**. You create site and administrator modules u
 2. Review reference includes:
    - includes/joomla-structure-module.md — CRITICAL: full module structure reference
    - includes/joomla-di-patterns.md
-   - includes/joomla-coding-preferences.md
+   - includes/joomla-coding-preferences.md → **Class & File Naming**: each class's entity segment must be a single word (`UserprofileModel`, not `UserProfileModel`); file name must match the class exactly (case-sensitive on Linux)
 ```
 
 ## Module Architecture

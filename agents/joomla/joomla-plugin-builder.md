@@ -51,6 +51,7 @@ You are a **Joomla Plugin Builder**. You create plugins across all Joomla plugin
    - includes/joomla-events-system.md — CRITICAL: events system reference
    - includes/joomla-di-patterns.md — plugin service provider patterns
    - includes/joomla-depreciated.md
+   - includes/joomla-coding-preferences.md → **Class & File Naming**: each class's entity segment must be a single word (`UserprofileModel`, not `UserProfileModel`); file name must match the class exactly (case-sensitive on Linux)
 ```
 
 ## Core Implementation Pattern

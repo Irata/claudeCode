@@ -56,6 +56,7 @@ Webservices plugin under: `{Vendor}\Plugin\WebServices\{Name}\`
    - includes/joomla-structure-api.md
    - includes/joomla-di-patterns.md
    - includes/joomla-depreciated.md
+   - includes/joomla-coding-preferences.md → **Class & File Naming**: each class's entity segment must be a single word (`UserprofileModel`, not `UserProfileModel`); file name must match the class exactly (case-sensitive on Linux)
 ```
 
 ## Directory Structure

@@ -481,6 +481,7 @@ class ItemController {
 During code review, verify each layer follows the pattern:
 
 #### **Administrator Layer Validation**
+- [ ] **Class/file naming** — every class's entity segment is a single word (`UserprofileModel`, not `UserProfileModel`); file name matches the class exactly; `View/<Entity>` folders contain no internal capitals (see "Class & File Naming — Case Convention")
 - [ ] **Models** contain complete getItem(), getItems(), save(), delete() implementations
 - [ ] **Models** contain all query building logic with no duplicates
 - [ ] **Models** contain all validation rules
@@ -1074,6 +1075,31 @@ When invoked as part of the orchestrator workflow, check for architecture and im
 
 ## Common Joomla Anti-Patterns to Flag
 
+### Class & File Naming — Case Convention (CRITICAL / IMPORTANT)
+
+Joomla resolves MVC and form-field names via `ucfirst(strtolower($name))` — only the first letter is capitalised and internal capitals are never restored. A multi-word CamelCase class name therefore cannot be produced by the resolver, and PSR-4 autoloading fails to find it on case-sensitive **Linux** filesystems (it silently works on Windows/macOS). Full rule: `includes/joomla-coding-preferences.md` → "Class & File Naming — Case Convention".
+
+**Rule:** the **entity segment** of every class name must be a single word (one leading capital, all other letters lowercase). Recognised type suffixes (`Controller`, `Model`, `DataModel`, `View`/`HtmlView`, `Table`, `Service`, `Field`, `Helper`, `Dispatcher`) keep normal casing. The file name must match the class name exactly.
+
+**Detection:**
+- Strip any recognised type suffix, then flag an entity segment matching `[A-Z][a-z0-9]*[A-Z]` (an internal capital).
+- Flag any `src/View/<Folder>` whose `<Folder>` ≠ `ucfirst(strtolower(<Folder>))` (i.e. contains an internal capital).
+- Flag class/file-name case mismatches (class `Foo`, file `foo.php`, or vice-versa).
+- Grep/Glob starting points:
+  - `class [A-Z][a-z0-9]+[A-Z][A-Za-z]*(Controller|Model|View|Table|Service|Field|Helper)\b` across `src/`
+  - `Glob 'src/View/*/'` then inspect each folder name for an internal capital
+  - Check `type="..."` attributes in `forms/*.xml` resolve to single-word `Field` classes
+  - Ignore non-class folders (`tmpl/`, `forms/`, `language/`, `media/`) — all-lowercase there is correct.
+
+**Severity — two tiers:**
+
+| Tier | Class types (how resolved) | Why |
+|------|----------------------------|-----|
+| 🚨 CRITICAL | `Controller`, `Model`, `View` folder, `Table`, form `Field` — resolved **by name** | Fatal *class not found* on case-sensitive Linux; only masked on Windows |
+| ⚠️ IMPORTANT | `Service`, `DataModel`, `Enum`, value objects, `Helper` — resolved **by explicit FQCN** (DI / `provider.php`) | Works today, but violates the convention and is inconsistent |
+
+**Fix:** collapse the entity to one lowercase-after-first token and rename the file to match — `UserProfileModel` → `UserprofileModel` (+ `UserprofileModel.php`), `View/ReviewActions` → `View/Reviewactions`, `SpacePartnerDataModel` → `SpacepartnerDataModel`, `PublicationState` → `Publicationstate`. Update **every** reference: `provider.php` registrations, `getModel()`/`createTable()`/`createModel()` call-site strings, `use` imports, and `type="..."` field attributes.
+
 ### Deprecated Functions
 - **`jexit()`**: Deprecated since 4.0, removed in 6.0. Flag any usage. Use `$this->checkToken()` in controllers or throw an exception.
 - **`Session::checkToken() || jexit()`**: The entire pattern is deprecated. Replace with `$this->checkToken()`.
@@ -1106,6 +1132,12 @@ When invoked as part of the orchestrator workflow, check for architecture and im
 - **Toolbar buttons opening modals**: When a `standardButton` should open a modal instead of submitting the form, it MUST use `->onclick('')` to suppress the default `Joomla.submitbutton()` call. Without this, the form submits and the page reloads. Use `->listCheck(true)` if the button should be disabled until list items are selected.
 - **Inline `<script>` without Web Asset Manager**: Prefer extracting JS to separate files loaded via `$wa = $this->getDocument()->getWebAssetManager()`. Inline scripts should be minimal (e.g., wiring data-attributes on toolbar buttons).
 - **Missing `form.validate` in edit views**: Any HtmlView whose template `<form>` has `class="form-validate"` MUST load the form validator via `$this->document->getWebAssetManager()->useScript('form.validate')` in `display()`. Without this, Save/Apply toolbar buttons fail with: `document.formvalidator is undefined`.
+
+### Database Query Patterns
+- **`bind()` called with an expression instead of a variable**: `DatabaseQuery::bind()` takes its value **by reference** (`&$value`), so only a variable is a legal argument. Flag any `->bind(..., <expression>, ...)` where the value is a function call, cast, concatenation, or ternary — e.g. `->bind(':name', trim($name), ...)`, `->bind(':id', (int) $id, ...)`, `->bind(':x', $a . $b, ...)`. This raises PHP's **"Only variables can be passed by reference"** error (the IDE flags it too).
+  - **Fix**: compute the value into a variable first, then bind the variable: `$name = trim((string) $name); ... ->bind(':name', $name, ParameterType::STRING);`
+  - Detection: Grep `->bind\(\s*[^,]+,\s*[^,$)]*\(` (value arg starting with a function call) and `->bind\([^,]+,\s*\((int|string|float|bool)\)` (value arg starting with a cast). See `includes/joomla-coding-preferences.md` → "DatabaseQuery `bind()` — By-Reference Gotcha".
+- **Reusing a loop variable across multiple `bind()` calls**: all bindings end up pointing to the final value. Store each value in a distinct array element (see same reference).
 
 ### File Upload Patterns
 - **Extension-only validation**: File uploads must validate both file extension AND MIME type (via `finfo`). Extension alone is trivially spoofable.

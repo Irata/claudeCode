@@ -5,7 +5,7 @@
 - **Project Name**: {{PROJECT_NAME}}
 - **Extension Type**: {{EXTENSION_TYPE}} (Component/Module/Plugin)
 - **Vendor Namespace**: {{VENDOR_NAMESPACE}} (e.g., Acme, Emporium)
-- **PHP Version**: 8.3+ (typed properties, constructor promotion, readonly, enums, `#[Override]`)
+- **PHP Version**: 8.5+ (typed properties, constructor promotion, readonly, enums, `#[Override]`)
 - **Joomla Version**: 5.2+ (Joomla Framework 2.0+)
 - **Project Status**: {{PROJECT_STATUS}} (Active/Maintenance/Archived)
 
@@ -14,7 +14,7 @@
 - **Repository**: `E:\repositories\{{REPO_NAME}}`
 - **PHPStorm Project**: `E:\PHPStorm Project Files\{{PROJECT_NAME}}`
 - **Joomla Instance**: `E:\www\{{DOMAIN}}`
-- **Build Output**: `E:\repositories\{{REPO_NAME}}\build`
+- **Build Output**: `E:\Extensions\install_files\`
 - **Phing Configuration**: `E:\repositories\{{REPO_NAME}}\build.xml`
 - **Work Log**: `E:\repositories\{{REPO_NAME}}\Files\work-log.md`
 

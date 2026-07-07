@@ -56,7 +56,7 @@ All classes under: `{Vendor}\Component\{Name}\Administrator\`
    - includes/joomla-structure-component.md
    - includes/joomla-di-patterns.md
    - includes/joomla-depreciated.md
-   - includes/joomla-coding-preferences.md
+   - includes/joomla-coding-preferences.md → **Class & File Naming**: each class's entity segment must be a single word (`UserprofileModel`, not `UserProfileModel`); file name must match the class exactly (case-sensitive on Linux)
 ```
 
 ## Code Architecture Pattern: DRY Principle with Layered Extension

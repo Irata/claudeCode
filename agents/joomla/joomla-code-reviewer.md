@@ -1139,6 +1139,18 @@ Joomla resolves MVC and form-field names via `ucfirst(strtolower($name))` — on
   - Detection: Grep `->bind\(\s*[^,]+,\s*[^,$)]*\(` (value arg starting with a function call) and `->bind\([^,]+,\s*\((int|string|float|bool)\)` (value arg starting with a cast). See `includes/joomla-coding-preferences.md` → "DatabaseQuery `bind()` — By-Reference Gotcha".
 - **Reusing a loop variable across multiple `bind()` calls**: all bindings end up pointing to the final value. Store each value in a distinct array element (see same reference).
 
+### Build & Packaging Patterns (Phing)
+
+**Check this on every existing project being reviewed or upgraded** — legacy build files predate the manifest-read convention and will not be fixed by any code change.
+
+- **Hardcoded `version` property in a Phing build file** (⚠️ IMPORTANT): Flag any `<property name="version" value="X.Y.Z" ... />` literal in `Phing/*.xml`. The extension manifest's `<version>` is the single source of truth; a second copy in the build file drifts from it and produces a zip named after one version containing a manifest declaring another.
+  - **Detection**: Grep `Phing/*.xml` for `<property name="version"\s+value="[0-9]` (a literal value rather than a `${...}` reference). Cross-check any hit against the `<version>` in the matching manifest — if they already differ, raise it as 🚨 CRITICAL, since releases built from that file are mispackaged today.
+  - **Fix**: **do not hand-convert during review.** Report it and run the **`version-bump` skill**, which converts a legacy build file to the manifest-read pattern as part of the next bump. The canonical pattern lives in `skills/joomla/version-bump/SKILL.md` (step 7).
+- **Missing fail-fast guard on the resolved version** (⚠️ IMPORTANT): Flag any build file that reads the version via `xmlproperty` but whose `build` target does not open with the `<fail>` guard on `${version}` still containing `mf.extension`. Phing leaves an unresolved property as its literal `${...}` token instead of erroring, so a wrong manifest path silently builds `com_example..zip`. Same fix route — the `version-bump` skill adds the guard.
+- **Version-bump instructions still listing the Phing file** (💡 SUGGESTION): Flag any project `CLAUDE.md`, README, or release checklist that tells the developer to update a version number in the Phing build file. Once the build file reads the manifest, the manifest bump is the only edit required — stale instructions reintroduce the duplicate.
+
+Reference: `skills/joomla/version-bump/SKILL.md` (conversion), `agents/joomla/joomla-build-agent.md` → "Version Source — Read From the Manifest, Never Duplicated" (rationale), `templates/Phing/` (reference build files).
+
 ### File Upload Patterns
 - **Extension-only validation**: File uploads must validate both file extension AND MIME type (via `finfo`). Extension alone is trivially spoofable.
 - **Missing size limits**: All file uploads should enforce a reasonable size limit.

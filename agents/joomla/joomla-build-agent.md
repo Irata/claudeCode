@@ -76,14 +76,63 @@ E:\repositories\{name}\
     └── update.xml             — Update server manifest
 ```
 
+## Version Source — Read From the Manifest, Never Duplicated
+
+**RULE: The extension manifest XML is the single source of truth for the version. Phing build files MUST read it at runtime and MUST NOT declare a `version` property literal.**
+
+A hardcoded `<property name="version" value="1.0.0" />` is a second copy of a number that already exists in the manifest. The two drift, and the build produces a zip named after one version containing a manifest that declares another — a mispackaged release that only surfaces after distribution.
+
+### Required pattern (component)
+
+```xml
+<property name="ext_name"   value="example" override="true" />
+<property name="ext_prefix" value="com_" override="true" />
+<property name="extension"  value="${ext_prefix}${ext_name}" override="true" />
+
+<property name="sourcedir"  value="E:/repositories/{name}" override="true" />
+<property name="targetdir"  value="E:/Extensions/install_files/${extension}" override="true" />
+
+<!-- Version READ FROM THE MANIFEST — do not reintroduce a version property literal. -->
+<xmlproperty file="${sourcedir}/admin/${extension}/${ext_name}.xml" prefix="mf" keepRoot="true" />
+<property name="version" value="${mf.extension.version}" override="true" />
+```
+
+### Required pattern (plugin)
+
+```xml
+<property name="sourcedir" value="E:/repositories/{name}/plugins/{group}" override="true" />
+
+<xmlproperty file="${sourcedir}/${ext_name}/${ext_name}.xml" prefix="mf" keepRoot="true" />
+<property name="version" value="${mf.extension.version}" override="true" />
+```
+
+### Mandatory fail-fast guard
+
+Phing leaves an unresolved property as its literal `${...}` token rather than erroring. Without a guard, a wrong manifest path silently builds `com_example..zip`. Every build target MUST open with:
+
+```xml
+<fail message="Could not read &lt;version&gt; from ${ext_name}.xml - check the manifest path.">
+    <condition>
+        <contains string="${version}" substring="mf.extension" />
+    </condition>
+</fail>
+
+<echo msg="Building ${extension} version ${version} (version read from the manifest)" />
+```
+
+### Notes
+- `keepRoot="true"` keeps the manifest's `<extension>` root in the property path, hence `mf.extension.version`.
+- The `prefix` (`mf`) namespaces the imported manifest values so they cannot collide with build properties.
+- Because the version is resolved at build time, no build file edit is required on a version bump — the manifest bump is enough.
+
 ## Phing Build File Template
 
 ### build.properties
 ```properties
 # Extension properties
+# NOTE: no ext.version here — the version is read from the manifest at build time
 ext.name=example
 ext.vendor=Vendor
-ext.version=1.0.0
 ext.joomla.min=5.2
 ext.php.min=8.3
 
@@ -104,16 +153,24 @@ dir.plugins=${dir.source}/Plugins
 <project name="com_example" default="package" basedir=".">
     <property file="build.properties"/>
 
+    <!-- Version READ FROM THE MANIFEST — never declared as a literal here -->
+    <xmlproperty file="${dir.admin}/${ext.name}.xml" prefix="mf" keepRoot="true"/>
+    <property name="ext.version" value="${mf.extension.version}" override="true"/>
+
     <target name="clean" description="Clean package output">
         <delete dir="${dir.packages}" quiet="true"/>
         <mkdir dir="${dir.packages}"/>
     </target>
 
-    <target name="version" description="Update version in manifest">
-        <replaceregexp
-            file="${dir.source}/${ext.name}.xml"
-            match="&lt;version&gt;.*&lt;/version&gt;"
-            replace="&lt;version&gt;${ext.version}&lt;/version&gt;"/>
+    <target name="version" description="Verify the version resolved from the manifest">
+        <!-- Unresolved properties stay as their literal token — fail rather than
+             build a zip named com_example-.zip -->
+        <fail message="Could not read &lt;version&gt; from ${ext.name}.xml - check the manifest path.">
+            <condition>
+                <contains string="${ext.version}" substring="mf.extension"/>
+            </condition>
+        </fail>
+        <echo msg="Building com_${ext.name} version ${ext.version} (version read from the manifest)"/>
     </target>
 
     <target name="package-component" depends="clean,version" description="Package component">
@@ -130,7 +187,10 @@ dir.plugins=${dir.source}/Plugins
             <fileset dir="${dir.media}" prefix="media/">
                 <include name="**/*"/>
             </fileset>
-            <fileset dir="${dir.source}">
+            <!-- Manifest and install script go to the package root, next to each other.
+                 <scriptfile> is resolved relative to the manifest, so script.php must sit
+                 at the root or preflight/install/postflight never run. -->
+            <fileset dir="${dir.admin}">
                 <include name="${ext.name}.xml"/>
                 <include name="script.php"/>
             </fileset>
@@ -214,17 +274,21 @@ dir.plugins=${dir.source}/Plugins
   - Incrementing **M** changes only **M** (e.g. `1.2.3` → `1.2.4`)
 
 ### Files to Update on Version Bump
-1. Extension manifest XML (`<version>`) — e.g. `admin/com_{name}/{name}.xml`
-2. Phing build file (`version` property) — e.g. `Phing/com_{name}.xml`
-3. SQL update script filename (`sql/updates/mysql/{version}.sql`)
-4. Package manifest if applicable (`pkg_{name}.xml`)
-5. Changelog
+1. Extension manifest XML (`<version>`) — e.g. `admin/com_{name}/{name}.xml` — **the single source of truth**
+2. SQL update script filename (`sql/updates/mysql/{version}.sql`)
+3. Package manifest if applicable (`pkg_{name}.xml`)
+4. Changelog
 
-**CRITICAL:** The manifest XML version, Phing build file version, and latest SQL update filename MUST always use the same V.R.M value. Version bumps to the manifest and Phing only occur when a **new** SQL update file is created — not when appending to an existing one.
+**The Phing build file is NOT in this list.** It reads `<version>` from the manifest at build time via `xmlproperty` (see "Version Source — Read From the Manifest, Never Duplicated"). If a Phing file in a project still carries a hardcoded `version` property, the `version-bump` skill converts it to the manifest-read pattern on the next bump — never edit the literal number.
+
+**CRITICAL:** The manifest XML version and the latest SQL update filename MUST always use the same V.R.M value. Version bumps only occur when a **new** SQL update file is created — not when appending to an existing one.
 
 ## Package Validation Checklist
 
 Before distribution, verify:
+- [ ] Phing build file reads the version from the manifest (`xmlproperty` + `mf.extension.version`) — no hardcoded `version` property
+- [ ] Phing build file has the fail-fast guard on an unresolved `${version}`
+- [ ] Built zip filename version matches the `<version>` inside the packaged manifest
 - [ ] Manifest XML has correct version, namespace, and file declarations
 - [ ] All declared files/folders exist in the package
 - [ ] SQL install scripts are complete

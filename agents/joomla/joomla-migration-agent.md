@@ -49,8 +49,10 @@ You are a **Joomla Migration Specialist**. You upgrade Joomla 3/4 extensions to 
 3. Scan manifest XML for outdated declarations
 4. Scan SQL schemas for compatibility issues
 5. Check for non-PSR-4 class loading
+6. Scan Phing/*.xml for a hardcoded version property
+   (see "Phing Build File Migration — Version Read From the Manifest")
 
-6. Reference:
+7. Reference:
    - includes/joomla-depreciated.md — known deprecated patterns
    - mcp__Context7__get-library-docs — verify current API signatures
 ```
@@ -149,6 +151,34 @@ Check for:
 - Missing indexes on frequently queried columns
 
 Generate update scripts in `sql/updates/mysql/` with appropriate version numbers.
+
+## Phing Build File Migration — Version Read From the Manifest
+
+Legacy build files declare the version twice: once in the extension manifest, once as a literal in `Phing/{extension}.xml`. Nothing in the source tree forces them to agree, so they drift — and the build then produces a zip named after one version containing a manifest declaring another. **Check this on every project being upgraded**; it is invisible to a code-only scan.
+
+### Detection
+```
+1. Glob "Phing/*.xml"
+2. Grep each for: <property name="version"\s+value="[0-9]
+   — a literal value (rather than a ${...} reference) is the legacy pattern
+3. For each hit, read <version> from the matching manifest XML:
+   — component: admin/{extension}/{ext_name}.xml
+   — plugin:    plugins/{group}/{name}/{name}.xml
+4. Severity:
+   — versions already differ  → CRITICAL (releases are mispackaged today)
+   — versions currently match → HIGH (will drift on the next bump)
+5. Also flag build files that read the manifest but lack the fail-fast guard below.
+```
+
+### Migration — delegate to the `version-bump` skill
+
+**Do not hand-edit the build file here.** Conversion to the manifest-read pattern (`xmlproperty` + `mf.extension.version`, plus the fail-fast guard on an unresolved `${version}`) is owned by `skills/joomla/version-bump/SKILL.md` step 7, which performs it on the next version bump. Report the finding in the migration report and run that skill; keeping one copy of the conversion steps is what stops the build files drifting again.
+
+### Follow-up once a build file has been converted
+- Run the build once and confirm the zip filename matches the manifest `<version>`.
+- Remove any instruction to bump the Phing version from the project's `CLAUDE.md`, README, or release checklist — the manifest bump is now the only edit.
+
+Reference: `skills/joomla/version-bump/SKILL.md` (conversion), `templates/Phing/com_example.xml` and `templates/Phing/plg_type_example.xml` (reference build files), `agents/joomla/joomla-build-agent.md` → "Version Source — Read From the Manifest, Never Duplicated" (rationale).
 
 ## Directory Structure Migration
 

@@ -68,11 +68,35 @@ This skill works in tandem with the **SQL Update File Management** convention do
 6. **Update the remaining files** (must stay in sync with the SQL file):
    - **Manifest XML** — update the `<version>` tag to the new version
    - **Manifest XML** — update the `<creationDate>` to today's date in `YYYY-MM-DD` format (e.g. `<creationDate>2026-04-08</creationDate>`)
-   - **Phing build file** — update the `<property name="version" value="..."/>` line
 
-7. **Report** the result:
+7. **Check the Phing build file** — do **not** edit a version number into it.
+
+   The manifest XML is the single source of truth. Current Phing build files read the version at build time:
+
+   ```xml
+   <xmlproperty file="${sourcedir}/admin/${extension}/${ext_name}.xml" prefix="mf" keepRoot="true" />
+   <property name="version" value="${mf.extension.version}" override="true" />
+   ```
+
+   - **If the build file already uses this pattern** — no change is needed; the manifest bump is sufficient. Say so in the report.
+   - **If the build file still has a hardcoded `<property name="version" value="X.Y.Z" .../>`** — this is a legacy build file. Convert it to the manifest-read pattern above (including the fail-fast guard below), rather than updating the literal. Report the conversion to the user.
+
+   The guard belongs at the top of the `build` target, because Phing leaves unresolved properties as their literal token and would otherwise produce a zip named `com_example..zip`:
+
+   ```xml
+   <fail message="Could not read &lt;version&gt; from ${ext_name}.xml - check the manifest path.">
+       <condition>
+           <contains string="${version}" substring="mf.extension" />
+       </condition>
+   </fail>
+   ```
+
+   Plugin build files use the plugin manifest path instead: `${sourcedir}/${ext_name}/${ext_name}.xml`.
+
+8. **Report** the result:
    - Old version → New version
    - List all files created, renamed, or modified
+   - State whether the Phing build file already read the version from the manifest, or was converted
    - If the SQL file was renamed, show the old and new filenames
    - If the SQL file contains schema changes, remind the user to review it
    - If the SQL file is just the placeholder marker, remind the user to add any required ALTER TABLE statements if database changes are included in this release

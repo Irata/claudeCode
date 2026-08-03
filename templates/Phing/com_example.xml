@@ -4,7 +4,6 @@
 <!-- ============================================  -->
 <project name="com_example" default="build">
 
-	<property name="version"   value="0.0.1" override="true" />
 	<property name="ext_name"   value="example" override="true" />
 	<property name="ext_prefix"   value="com_" override="true" />
 	<property name="extension"   value="${ext_prefix}${ext_name}" override="true" />
@@ -12,11 +11,33 @@
     <property name="sourcedir" value="E:/repositories/somewhere" override="true" />
     <property name="targetdir" value="E:/Extensions/install_files/${extension}" override="true" />
 
+	<!--
+		The version is READ FROM THE MANIFEST rather than repeated here.
+
+		Keeping a second copy of the version in the build file is what produced mispackaged
+		releases before: the two numbers drift, and the zip ends up named after one version
+		while the manifest inside it declares another. Do NOT reintroduce a
+		<property name="version" .../> literal.
+	-->
+	<xmlproperty file="${sourcedir}/admin/${extension}/${ext_name}.xml" prefix="mf" keepRoot="true" />
+	<property name="version" value="${mf.extension.version}" override="true" />
+
     <!-- ============================================  -->
     <!-- Target: build                                 -->
     <!-- ============================================  -->
     <target name="build" >
-    	
+
+		<!-- If xmlproperty could not resolve, ${version} is still the literal token. Stop
+		     rather than build a zip named com_example..zip. -->
+		<fail message="Could not read &lt;version&gt; from ${ext_name}.xml - check the manifest path.">
+			<condition>
+				<contains string="${version}" substring="mf.extension" />
+			</condition>
+		</fail>
+
+		<echo msg="Building ${extension} version ${version} (version read from the manifest)" />
+		<echo msg="-----------------------------------" />
+
 		<echo msg="Deleting existing folders and files before building new target..." />
 		<echo msg="-----------------------------------" />
 		<delete dir="${targetdir}" />
@@ -67,6 +88,8 @@
 				<include name="**/**" />
 			</fileset>
 		</zip>
+
+		<echo msg="Built ${targetdir}.${version}.zip" />
 	</target>
 
 </project>

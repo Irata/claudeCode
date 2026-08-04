@@ -21,8 +21,10 @@
     ├── services/
     │   └── provider.php
     └── src/
-       └── Extension
-           └── Example.php
+       ├── Extension/
+       │   └── Example.php
+       └── Field/
+           └── EndpointsField.php   ← endpoint reference (see pattern below)
 ```
 ### JsonApiView Property Types
 
@@ -147,6 +149,296 @@ class JsonApiView extends \Vendor\Component\Example\Api\View\Examples\JsonApiVie
 The endpoint-specific filter must exist in the list model's `getListQuery()`
 (prefer an index-friendly prefix `LIKE 'term%'` over `%term%` for type-ahead). Add a
 supporting column index when searching a large table.
+
+### Self-Documenting Webservices Plugin (endpoint reference in the plugin options)
+
+**Required for every webservices plugin, new or revised.** A plugin that registers API routes
+must publish those routes in its own options screen. Routes declared only inside
+`onBeforeApiRoute()` are discoverable only by reading the source, which is the wrong place
+to send an integrator — and the wrong place for the site administrator who has to answer "what
+can this token call?".
+
+The plugin has no settings of its own, so its options tab is free real estate. Fill it with a
+read-only reference rendered against **the site being looked at**: this site's base URL, and
+worked examples naming resources that actually exist here. Placeholder text (`https://yoursite/…`)
+is worth far less — the point is that an integrator can copy a line and have it work.
+
+#### 1. The field class (`src/Field/EndpointsField.php`)
+
+```php
+<?php
+
+namespace Vendor\Plugin\WebServices\Example\Field;
+
+\defined('_JEXEC') or die;
+
+use Joomla\CMS\Factory;
+use Joomla\CMS\Form\FormField;
+use Joomla\CMS\Language\Text;
+use Joomla\CMS\Uri\Uri;
+use Joomla\Database\DatabaseInterface;
+
+/**
+ * Read-only documentation of the API routes this plugin registers.
+ *
+ * Stores nothing: getInput() renders and the value is never saved.
+ */
+final class EndpointsField extends FormField
+{
+    protected $type = 'Endpoints';
+
+    /** How many live resources to list before summarising the remainder. */
+    private const SAMPLE_LIMIT = 10;
+
+    protected function getInput(): string
+    {
+        $base = $this->apiBase();
+
+        return '<div class="alert alert-info">' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_AUTH') . '</div>'
+            . $this->routesTable($base)
+            . '<p class="mt-3 mb-1"><strong>' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_QUERY_HEADING') . '</strong></p>'
+            . $this->queryList()
+            . '<p class="mt-3 mb-1"><strong>' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_EXAMPLES_HEADING') . '</strong></p>'
+            . $this->examples($base);
+    }
+
+    /**
+     * The API entry point for this site, e.g. https://example.com/api/index.php.
+     *
+     * Uri::root() is safe here in a way it is not everywhere: this field only ever renders on
+     * the plugin options screen, which is an administrator web request. There is always a real
+     * host to derive, and AdministratorApplication::doExecute() has already reset the URI root
+     * back to the SITE root, so no '/administrator' segment leaks into the addresses.
+     */
+    private function apiBase(): string
+    {
+        return Uri::root() . 'api/index.php';
+    }
+
+    private function routesTable(string $base): string
+    {
+        $routes = [
+            ['GET',  '/v1/example/items',      'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_ROUTE_LIST'],
+            ['GET',  '/v1/example/items/{id}', 'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_ROUTE_ITEM'],
+            ['POST', '/v1/example/items',      'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_ROUTE_CREATE'],
+        ];
+
+        $rows = '';
+
+        foreach ($routes as [$method, $path, $key]) {
+            $rows .= '<tr>'
+                . '<td class="text-nowrap"><span class="badge bg-success">' . $this->e($method) . '</span></td>'
+                . '<td class="text-break"><code>' . $this->e($base . $path) . '</code></td>'
+                . '<td>' . Text::_($key) . '</td>'
+                . '</tr>';
+        }
+
+        return '<table class="table table-sm align-middle mb-0">'
+            . '<thead><tr>'
+            . '<th scope="col">' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_COL_METHOD') . '</th>'
+            . '<th scope="col">' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_COL_ENDPOINT') . '</th>'
+            . '<th scope="col">' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_COL_PURPOSE') . '</th>'
+            . '</tr></thead><tbody>' . $rows . '</tbody></table>';
+    }
+
+    private function queryList(): string
+    {
+        $params = [
+            'page[limit]=20'  => 'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_QUERY_LIMIT',
+            'page[offset]=0'  => 'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_QUERY_OFFSET',
+            'filter[state]=1' => 'PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_QUERY_FILTER',
+        ];
+
+        $items = '';
+
+        foreach ($params as $example => $key) {
+            $items .= '<li class="text-break"><code>?' . $this->e($example) . '</code> — ' . Text::_($key) . '</li>';
+        }
+
+        return '<ul class="mb-0">' . $items . '</ul>';
+    }
+
+    /** Worked examples naming this site's own records where there are any. */
+    private function examples(string $base): string
+    {
+        $records = $this->liveResources();
+
+        if (!$records) {
+            return '<p class="text-muted mb-1">' . Text::_('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_NO_RESOURCES') . '</p>'
+                . '<ul class="mb-0"><li class="text-break"><code>'
+                . $this->e($base . '/v1/example/items/1') . '</code></li></ul>';
+        }
+
+        $items = '';
+
+        foreach (\array_slice($records, 0, self::SAMPLE_LIMIT) as $record) {
+            $items .= '<li class="text-break"><code>'
+                . $this->e($base . '/v1/example/items/' . $record->id) . '</code>'
+                . ' — ' . $this->e($record->title) . '</li>';
+        }
+
+        $more = \count($records) > self::SAMPLE_LIMIT
+            ? '<p class="text-muted mt-1 mb-0">'
+                . Text::sprintf('PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_MORE', \count($records) - self::SAMPLE_LIMIT)
+                . '</p>'
+            : '';
+
+        return '<ul class="mb-0">' . $items . '</ul>' . $more;
+    }
+
+    /**
+     * Returns an empty array rather than throwing when the component is absent: a webservices
+     * plugin can legitimately outlive its component (part-installed, or the component removed),
+     * and an options screen that fatals is a worse outcome than one missing its examples.
+     */
+    private function liveResources(): array
+    {
+        try {
+            $db    = Factory::getContainer()->get(DatabaseInterface::class);
+            $query = $db->getQuery(true)
+                ->select($db->quoteName(['id', 'title']))
+                ->from($db->quoteName('#__example_items'))
+                ->where($db->quoteName('state') . ' = 1')
+                ->order($db->quoteName('modified') . ' DESC');
+
+            return (array) $db->setQuery($query)->loadObjectList();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function e(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    }
+}
+```
+
+#### 2. Manifest config block (`example.xml`)
+
+`addfieldprefix` is what makes the custom type resolvable — see the trap below.
+
+```xml
+<config>
+    <fields name="params">
+        <!-- Documentation only; this plugin stores no settings. -->
+        <fieldset name="basic"
+                  addfieldprefix="Vendor\Plugin\WebServices\Example\Field">
+            <field name="endpoints"
+                   type="endpoints"
+                   label="PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_LABEL"
+                   description="PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_DESC"
+            />
+        </fieldset>
+    </fields>
+</config>
+```
+
+The existing `<files><folder>src</folder></files>` already ships `src/Field/` — no manifest file
+list change is needed beyond the `<config>` block.
+
+#### 3. Language strings
+
+All prose belongs in the `.ini`, never in the PHP. `Text::_()` output is **not escaped** by the
+field, so simple markup (`<code>`, `&rarr;`, `&lt;`) renders — which is what you want for
+inline examples. Escape only the *dynamic* values, via the `e()` helper above.
+
+```ini
+PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_LABEL="Available Endpoints"
+PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_DESC="Reference only — this plugin has no settings to change. The addresses below are this site's own and can be copied as they stand."
+PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_AUTH="Every route requires a Joomla API token sent as an <code>Authorization: Bearer &lt;token&gt;</code> header. A token only reaches the records its user's access level permits, so two callers can be given the same endpoint and see different data. Create tokens under Users &rarr; Manage &rarr; API Tokens."
+```
+
+#### What the reference must cover
+
+| Include | Because |
+|---|---|
+| Every registered route, with method and full URL | The whole point; mirror `onBeforeApiRoute()` exactly |
+| Authentication, and that access is per-record | Administrators consistently assume a token sees everything |
+| Each query parameter, **and how it fails** | "rejected with 400" saves a support round-trip |
+| Content-negotiation traps | e.g. a bare `Accept: text/csv` is refused with 406 upstream, before the component sees it |
+| Live example URLs | Turns the screen from documentation into something copy-pasteable |
+
+#### Trap 1 — a custom field type that does not resolve falls back to a text input, silently
+
+If `addfieldprefix` is missing or the namespace is wrong, Joomla does **not** error. It resolves
+`type="endpoints"` to `Joomla\CMS\Form\Field\TextField` and renders a stray text box on the
+options screen. Nothing in a lint, a syntax check, or an install will tell you. **Always render
+the field once and assert the resolved class** (harness below).
+
+#### Trap 2 — `Uri::root()` and the administrator root reset
+
+`Uri::root()` is the correct API for the site root here, but understand *why* it is safe:
+`AdministratorApplication::doExecute()` resets the URI root back to the site root, stripping
+`/administrator`. Options screens always render inside that application, so the reset has always
+run. Two consequences:
+
+- Do **not** copy this `apiBase()` into a console, task, or CLI context. There, `Uri::root()`
+  yields `https://joomla.invalid/set/by/console/application/` unless the site sets `$live_site`.
+- A CLI **test harness** must reproduce the reset, or it measures a state that never occurs.
+
+#### Verifying it (build the form from the real manifest)
+
+Rendering programmatically catches both traps. Run from the Joomla root:
+
+```php
+// Pretend to be an administrator web request.
+$_SERVER['HTTP_HOST']   = 'example.local';
+$_SERVER['SCRIPT_NAME'] = '/administrator/index.php';
+$_SERVER['REQUEST_URI'] = '/administrator/';   // the DIRECTORY — see note below
+$_SERVER['HTTPS']       = 'on';
+
+\define('_JEXEC', 1);
+\define('JPATH_BASE', 'E:/www/example');
+require_once JPATH_BASE . '/includes/defines.php';
+require_once JPATH_BASE . '/includes/framework.php';
+
+$container = \Joomla\CMS\Factory::getContainer();
+$container->alias('session', 'session.cli')
+    ->alias(\Joomla\Session\SessionInterface::class, 'session.cli');
+
+$app = $container->get(\Joomla\CMS\Application\ConsoleApplication::class);
+\Joomla\CMS\Factory::$application = $app;
+
+// A real application registers extension namespaces during execute(); without this every
+// extension class silently fails to autoload and the field falls back to TextField.
+\JLoader::register('JNamespacePsr4Map', JPATH_LIBRARIES . '/namespacemap.php');
+(new \JNamespacePsr4Map())->load();
+
+// Reproduce AdministratorApplication::doExecute()'s root reset (see Trap 2).
+\Joomla\CMS\Uri\Uri::root(null, rtrim(\dirname(\Joomla\CMS\Uri\Uri::base(true)), '/\\'));
+
+$app->getLanguage()->load('plg_webservices_example', JPATH_BASE . '/plugins/webservices/example');
+
+$manifest = simplexml_load_file(JPATH_BASE . '/plugins/webservices/example/example.xml');
+$xml      = '<?xml version="1.0"?><form>' . $manifest->config->fields->asXML() . '</form>';
+$form     = \Joomla\CMS\Form\Form::getInstance('t' . mt_rand(), $xml, ['control' => 'jform']);
+
+$field = $form->getField('endpoints', 'params');
+echo $field ? 'resolved as ' . $field::class . "\n" : "FAIL: did not resolve\n";  // Trap 1
+
+$html = $form->renderField('endpoints', 'params');
+preg_match_all('/PLG_WEBSERVICES_[A-Z_]+/', $html, $m);
+echo $m[0] ? "FAIL untranslated: " . implode(', ', array_unique($m[0])) . "\n" : "all keys resolved\n";
+
+preg_match_all('#https?://[^<\s"]+#', $html, $u);
+print_r(array_unique($u[0]));   // must have no '/administrator' segment
+```
+
+> **`REQUEST_URI` must point at the admin *directory*.** Under CLI, `Uri::base()` derives its
+> path from `REQUEST_URI`; under a web SAPI it uses `dirname(SCRIPT_NAME)`. Passing
+> `/administrator/index.php` makes the two branches disagree and every URL gains a segment —
+> a harness artefact that looks exactly like a code bug.
+
+**Pass criteria:** the field resolves to your own class (not `TextField`), no `PLG_…` constants
+survive in the output, and the emitted URLs match what a client actually calls.
+
+#### Keeping it honest
+
+The reference lives next to the routes it documents, but nothing enforces agreement. When
+`onBeforeApiRoute()` changes, the field changes in the same commit — treat them as one unit.
+Where a project also keeps a `.http` request file, prefer the field as the source of truth and
+let the `.http` file hold only the requests.
 
 ### Component Key Files
 - `/language` - Language files are installed within the component.

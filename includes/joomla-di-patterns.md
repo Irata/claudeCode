@@ -265,6 +265,26 @@ $container->set(BoardService::class, fn(Container $c) => new BoardService(
 ));
 ```
 
+### AuthorisationService Registration (No Dependencies)
+
+The **one** Service that injects nothing is the component's single point of
+authorisation. It performs no data access — permission decisions go through Joomla's
+ACL engine (`User::authorise()`), not SQL — so it takes no DataModel and no
+`DatabaseInterface`. Register it as a bare instance:
+
+```php
+use Vendor\Component\Example\Administrator\Service\AuthorisationService;
+
+$container->set(
+    AuthorisationService::class,
+    fn(Container $c) => new AuthorisationService()
+);
+```
+
+All contexts (admin, Site, API, CLI) resolve this same instance and ask it the same
+questions, so ACL logic exists in exactly one file. Full pattern:
+`includes/joomla-authorisation-service-pattern.md`.
+
 ### Anti-Patterns to Avoid
 
 ```php

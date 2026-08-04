@@ -184,6 +184,21 @@ These are exceptions, not a general license — ordinary per-record writes still
 - The manifest XML is for extension metadata, installation instructions, namespace, and file declarations only.
 - This applies to all extension types: components, modules, and plugins.
 
+### Language Files — `.ini` vs `.sys.ini`
+- A key rendered **outside the component's own execution** MUST be defined in `{name}.sys.ini`, not the regular `{name}.ini`. The regular `.ini` is loaded only while the component itself runs, so any string shown by another part of Joomla falls back to the raw key (e.g. `COM_EXAMPLE_SUBMENU_ITEMS` displayed literally).
+- Belongs in `.sys.ini`:
+  - Manifest `<name>`, `<administration><menu>`, and `<submenu><menu>` labels — rendered as `#__menu` admin-menu titles by the admin template / `mod_menu`.
+  - Site menu-item type metadata in `site/.../tmpl/{view}/default.xml` — the `<layout title="...">` and `<message>` strings. `com_menus` (`MenutypesModel`) loads `{option}.sys` from the administrator when a user adds a menu item.
+  - The extension `<description>` (`COM_EXAMPLE_XML_DESCRIPTION`).
+- Stays in the regular `.ini` (loaded by `com_config`/the component itself when those screens render):
+  - `config.xml` field labels and descriptions.
+  - `access.xml` action titles (Permissions tab).
+  - All strings the component's own controllers, models, views, and templates emit.
+- Menu/menu-item language key segments are UPPERCASE (`COM_EXAMPLE_ITEMS_MENU`, not `COM_EXAMPLE_items_MENU`) — the view-name segment is capitalised like every other key.
+- **Admin and site have separate `.ini` files and the front end loads ONLY the site one.** Any key a site view/template renders (toolbar labels, error messages, field labels, titles) MUST exist in `site/.../language/{tag}/{name}.ini`, even when the admin `.ini` already defines it. Duplicating shared keys across both files is normal and expected in Joomla — the two files do not share a namespace at runtime.
+- When generating language files, split keys by **where each key is rendered** (admin screen, site screen, or outside-component `.sys`), never by a name-prefix heuristic — prefix-matching silently drops keys that do not fit the pattern (a real cause of raw keys like `COM_EXAMPLE_TOOLBAR_EXPORT` on the front end).
+- Verify by resolving through the actual loader path, not by eye: `$lang->load('{option}.sys', JPATH_ADMINISTRATOR)` (or `$lang->load('{option}', JPATH_SITE . '/components/{option}')` for the front end) then `Text::_($key)` must return the translation, not the key. Better still, load the rendered screen over authenticated HTTP and grep for raw `COM_*` constants.
+
 ### Repository Folder Structure
 - Components are stored in `Components/com_{name}/` with `admin/`, `api/`, `media/`, and `site/` as peer subdirectories.
 - The `/api` folder is a subfolder of the component — NOT a top-level directory.
@@ -528,6 +543,13 @@ KEY `idx_lft` (`lft`)
 - The `<fields name="list">` section should only contain the `limit` (limitbox) field
 - Filter dropdowns go in `<fields name="filter">`
 
+### Rendering the List Filter Bar (searchtools)
+- Render the search/filter toolbar with `LayoutHelper::render('joomla.searchtools.default', ['view' => $this])` — **NOT** `HTMLHelper::_('searchtools.default', ...)`.
+- There is **no** `searchtools.default` HTMLHelper method: `Joomla\CMS\HTML\Helpers\SearchTools` exposes only `form()` and `sort()`, so `HTMLHelper::_('searchtools.default', ...)` throws `500 searchtools::default not found`. This is a common miscopy — the sort links are HTMLHelper calls, but the filter bar is a layout render.
+- `LayoutHelper::render` requires `use Joomla\CMS\Layout\LayoutHelper;` in the template — omitting it fails with `Class "LayoutHelper" not found`.
+- Column-header sort links remain `HTMLHelper::_('searchtools.sort', $titleKey, $orderColumn, $listDirn, $listOrder)` — that method does exist.
+- The view must expose `filterForm`, `activeFilters`, and `state` (set from the model in `display()`); the layout reads them.
+
 ### Model Error Surfacing
 - All ListModel and AdminModel subclasses MUST use the `DebugErrorAwareTrait`
 - The trait overrides `setError()` to enqueue errors as warnings when `JDEBUG` is active
@@ -542,3 +564,10 @@ KEY `idx_lft` (`lft`)
 - DataModels use Table classes internally for CUD operations (bind/check/store/delete)
 - Documented exceptions for bulk/atomic operations stay as direct SQL in DataModels
 - DataModels are registered in `services/provider.php` via `MVCFactoryInterface::createModel()`
+
+### Single Point of Authorisation
+- Every component that serves more than one context (admin, API, CLI, plugins) MUST centralise **all** access-control decisions in one `Administrator\Service\AuthorisationService`. Do NOT scatter `$user->authorise()` calls across controllers, models, views, and API endpoints — that is how admin and API rules silently drift apart.
+- The AuthorisationService is the **one Service that injects no DataModel/DatabaseInterface** — it performs no data access; permission decisions go through Joomla's ACL engine (`User::authorise()`). Register it as a bare `new AuthorisationService()`.
+- Provide, for each enforced action, both a `can*()`/`authorise*()` bool method (for views to show/hide UI) and an `assert*()` twin that throws `NotAllowed` (for controllers/API to enforce as a 403).
+- Implement owner cascades (`edit`/`edit.own`, `delete`/`delete.own`) once, taking the row's `created_by`; never re-implement them per context.
+- Full pattern and reference implementation: `includes/joomla-authorisation-service-pattern.md`.

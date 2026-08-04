@@ -510,3 +510,27 @@ defined('_JEXEC') or die;
 ### `$query->dump()` — Do NOT Remove
 **Pattern**: `$query->dump()` marked deprecated since Joomla 3
 **Status**: Despite the deprecation marker, this method **must not be removed** from existing code. It is actively used for debugging SQL statements during development. Agents and code reviewers must leave existing `dump()` calls in place.
+
+### AbstractEvent `get<Name>()` / `onGet<Name>()` Value Pre-Processor Hooks (Deprecated, removed in Joomla 7)
+**Pattern**: Relying on `AbstractEvent::getArgument($name)` auto-calling a `get<Ucfirst($name)>()` (or `onGet<Ucfirst($name)>()`) method as a value pre-processor
+**Risk**: **High** — beyond the deprecation, a custom getter that re-reads its own argument via `getArgument()` causes **infinite recursion → stack overflow** (PHP 8.3+: *"Maximum call stack size … reached. Infinite recursion?"*, a catchable `\Error`, **not** an `\Exception`)
+
+`Joomla\CMS\Event\AbstractEvent::getArgument('context')` internally calls `getContext($rawValue)` when a `getContext()` method exists. An accessor that then calls `getArgument('context')` re-enters that dispatch forever. Only names where `get<Ucfirst($argName)>` equals the method name collide (`context`→`getContext` collides; `date_start`→`getDate_start` does not).
+
+#### Detection Pattern
+```php
+// WRONG — recurses: getArgument('context') → getContext() → getArgument('context') → …
+public function getContext()
+{
+    return $this->getArgument('context');
+}
+```
+
+#### Recommended Migration
+```php
+// CORRECT — read the raw argument store directly; never route an accessor back through getArgument()
+public function getContext()
+{
+    return $this->arguments['context'] ?? null;
+}
+```

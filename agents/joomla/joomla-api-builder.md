@@ -123,6 +123,26 @@ class TrolleyController extends ApiController {
 }
 ```
 
+### Authorisation in the API — reuse, never re-implement
+
+The API MUST enforce access control through the **same** `Administrator\Service\
+AuthorisationService` the admin uses — never with fresh `$user->authorise()` calls in
+API controllers. Divergent rules between admin and API are a Broken Access Control
+risk. Resolve it via `bootComponent('com_example')->getContainer()->get(AuthorisationService::class)`
+(API controllers are in a separate namespace — see the bootComponent section below),
+then call its `assert*()` methods so a forbidden request becomes a clean 403:
+
+```php
+$auth = $this->app->bootComponent('com_example')
+    ->getContainer()->get(AuthorisationService::class);
+$auth->assertCanCreateItem($categoryId);   // throws NotAllowed (403); honours trusted-service key
+```
+
+The AuthorisationService is also where trusted service-to-service calls are recognised
+(shared-secret header, `hash_equals`, fail-closed), so backend-to-backend API callers
+and end users flow through one decision point. Pattern:
+`includes/joomla-authorisation-service-pattern.md`.
+
 ---
 
 ## Code Architecture Pattern: Extending Administrator Layer
@@ -520,6 +540,36 @@ final class Example extends CMSPlugin implements SubscriberInterface
     }
 }
 ```
+
+#### Endpoint Reference in the Plugin Options — REQUIRED
+
+Every webservices plugin you create **or revise** must publish its registered routes in its own
+options screen. The plugin holds no settings, so the options tab is free space; fill it with a
+read-only reference rendered against the site being looked at — real base URL, real example
+records — so an integrator can copy a line and have it work rather than reading
+`onBeforeApiRoute()` to find out what exists.
+
+Deliverables (full code samples in `includes/joomla-structure-api.md`, "Self-Documenting
+Webservices Plugin"):
+
+1. `src/Field/EndpointsField.php` — a `FormField` that stores nothing and renders the routes,
+   the auth requirement, each query parameter **and how it fails**, plus live example URLs
+   queried from the component's table (caught, so an absent component degrades to a placeholder
+   rather than fatalling the options screen).
+2. A `<config><fields name="params">` block in the plugin manifest whose `<fieldset>` carries
+   `addfieldprefix="Vendor\Plugin\WebServices\Example\Field"`.
+3. Language strings for every piece of prose — none in the PHP.
+
+Two failure modes to check for, neither of which a lint or an install will surface:
+
+- **A custom field type that does not resolve silently becomes a text input.** Wrong or missing
+  `addfieldprefix` renders a stray text box instead of erroring. Render the field once and
+  assert the resolved class is yours, not `Joomla\CMS\Form\Field\TextField`.
+- **`Uri::root()` is only trustworthy here** because the options screen runs inside
+  `AdministratorApplication`, which resets the URI root to the site root. Never carry the same
+  `apiBase()` into a console or task context, where it yields `https://joomla.invalid/…`.
+
+When the routes change, the field changes in the same commit.
 
 #### Plugin Service Provider
 ```php

@@ -100,8 +100,18 @@ Detection patterns:
 - API endpoints without authentication enforcement
 - Missing canDo checks before toolbar buttons
 - Direct model access bypassing controller ACL
+- ACL logic duplicated/drifting across contexts: raw $user->authorise() calls scattered
+  in controllers/models/views/API instead of a single Administrator\Service\
+  AuthorisationService. Divergent rules between admin and API are a Broken Access
+  Control (A01) risk — the same operation must resolve to the same permission decision
+  in every context. Verify one AuthorisationService is the single enforcement point.
+- Trusted service-to-service key checks that fail open (allow when key unconfigured) or
+  compare secrets with === instead of hash_equals() (timing attack).
+- Owner-cascade checks (edit.own/delete.own) re-implemented per context instead of once
+  in the AuthorisationService — a common source of edit-own bypass on the API.
 
-Cross-reference against: architecture-{ext}-acl-matrix
+Cross-reference against: architecture-{ext}-acl-matrix, architecture-{ext}-authorisation
+Reference: includes/joomla-authorisation-service-pattern.md
 ```
 
 ### Phase 5: File Upload Analysis

@@ -231,6 +231,126 @@ if ($plugin) {
 
 This is useful when configuration should be centralised in one plugin but consumed by another at runtime.
 
+## Modernizing a Legacy Plugin to Current Joomla Conventions
+
+When bringing an existing plugin up to date (Joomla 3/4-era code → 5.x conventions), apply these patterns. **The overriding constraint is backward compatibility**: existing callers that dispatch the plugin's events via `$app->triggerEvent('onX', [...])` and read the returned result array must keep working unchanged. Modernize the plugin internally; do not force changes onto callers.
+
+### 1. Legacy listeners → `SubscriberInterface`
+
+Legacy `CMSPlugin` auto-registers every public `on*` method and, for each, inspects the signature to decide legacy-vs-modern dispatch. This emits a deprecation (`"The plugin should implement SubscriberInterface"`). Migrate:
+
+```php
+final class Example extends CMSPlugin implements SubscriberInterface
+{
+    public static function getSubscribedEvents(): array
+    {
+        // Keep the SAME event names the callers already dispatch — this is what preserves B/C.
+        return [
+            'onExampleOpen'  => 'onExampleOpen',
+            'onExampleClose' => 'onExampleClose',
+        ];
+    }
+}
+```
+
+**Consequence to handle:** once a subscriber, every listed method receives the `Event` object — there is no legacy argument unpacking. A method that used to take positional args must read them from the event. For an event dispatched as `triggerEvent('onExampleClose', [$sid])`, the argument key is `0`:
+
+```php
+public function onExampleClose(Event $event): void   // Joomla\Event\Event
+{
+    $sid = $event->getArgument('0');   // positional arg 0 from the caller's array
+    // ...
+}
+```
+
+(If you keep a method on the *legacy* path instead, its single parameter must be named exactly `$event`, non-nullable, and typed to an `EventInterface` implementation — otherwise `CMSPlugin` treats it as legacy. `SubscriberInterface` bypasses that check entirely.)
+
+### 2. Return event results via `ResultAwareInterface` (with a B/C fallback)
+
+To hand a value back to callers the modern way, use `Joomla\CMS\Event\Result\ResultAwareInterface::addResult()`. **But two facts force a fallback:**
+
+- A custom event name that isn't in Joomla's event-class map resolves to the base `Joomla\Event\Event`, which is **not** result-aware.
+- A modern (Event-typed) listener's **return value is not auto-collected** into the result set — only the legacy wrapper did that. So a plain `return $sid;` no longer reaches `triggerEvent()` callers.
+
+Publish through a small helper that covers both, and keep the direct return for any in-process callers:
+
+```php
+public function onExampleOpen(Event $event): ?string
+{
+    $sid = $this->doOpen();
+
+    if ($sid !== null) {
+        $this->publishResult($event, $sid);
+    }
+
+    return $sid;   // retained for direct/in-process callers
+}
+
+private function publishResult(Event $event, $result): void
+{
+    if ($event instanceof ResultAwareInterface) {
+        $event->addResult($result);          // modern, result-aware events
+        return;
+    }
+
+    // B/C: plain Joomla\Event\Event dispatched by triggerEvent('onX') — append to 'result'
+    // so callers reading $results['0'] keep working.
+    $results   = (array) $event->getArgument('result', []);
+    $results[] = $result;
+    $event->setArgument('result', $results);
+}
+```
+
+### 3. Replace deprecated APIs
+
+| Deprecated | Modern replacement | Note |
+|-----------|--------------------|------|
+| `Factory::getDbo()` | `Factory::getContainer()->get(DatabaseInterface::class)` | `use Joomla\Database\DatabaseInterface;` |
+| `Table::set('field', $v)` / `Table::get()` | Direct property: `$table->field = $v;` | Safe after `$table->load(...)` populates the property |
+| `new \DateTime($t, new \DateTimeZone($tz))` | `Factory::getDate($t, $tz)` | Returns `Joomla\CMS\Date\Date` |
+| Hardcoded timezone string | `$this->getApplication()->get('offset', 'UTC')` | Site-configured timezone |
+| `error_log()` | `Joomla\CMS\Log\Log::add()` | See §5 |
+
+**`Date::format()` gotcha:** `Date::format($fmt, $local = false)` coerces output to **UTC** when `$local` is falsy. To format in the object's timezone (the usual intent) pass `true`: `Factory::getDate('now', $tz)->format('H:i', true)`.
+
+### 4. Type declarations — modernize cautiously
+
+Add return types and parameter types, but **do not** put a non-nullable scalar hint (`string $x`) on a value sourced from `$this->params->get(...)` — that returns `null` for unset params and would throw a `TypeError`. Type the return, leave such params untyped or nullable. In a namespaced file, `@throws Exception` resolves to a non-existent namespaced class — write `@throws \Exception`.
+
+### 5. Resilience at I/O boundaries + optional logging
+
+Wrap external/remote calls (gateway/HTTP/DB against a remote) in `try/catch (\Throwable)` so a failure degrades gracefully instead of fatalling the request — especially for events that fire during page render. Normalize the failure into whatever shape the existing flow already handles (e.g. an "inactive" response the plugin's own status logic understands), then log:
+
+```php
+try {
+    return RemoteGateway::start(...);
+} catch (\Throwable $e) {
+    $this->log('Gateway start failed: ' . $e->getMessage(), Log::ERROR);
+    return ['state' => 'inactive', 'error_message' => $e->getMessage()];  // existing flow handles this
+}
+```
+
+For diagnostic logging that's off in normal operation, gate it behind a plugin param and register the logger once (lazily, guarded) so nothing is written when disabled:
+
+```php
+private function log(string $message, int $priority): void
+{
+    if (!$this->params->get('logging', 0)) {   // radio '0' is falsy → skip entirely
+        return;
+    }
+
+    static $registered = false;
+    if (!$registered) {
+        Log::addLogger(['text_file' => 'plg_{group}_{name}.php'], Log::ALL, ['plg_{group}_{name}']);
+        $registered = true;
+    }
+
+    Log::add($message, $priority, 'plg_{group}_{name}');
+}
+```
+
+Add the toggle as a `radio` field (`default="0"`) in the manifest's first `<fieldset>` with matching `_LABEL`/`_DESC` language strings.
+
 ## Key Rules
 
 1. **Always use `final class`** for plugin extension classes

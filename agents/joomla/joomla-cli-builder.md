@@ -105,6 +105,13 @@ class CleanupCommand extends AbstractCommand {
 
 **CLI commands use Administrator models and services** rather than reimplementing data access logic. The Administrator layer contains the canonical implementation of all business logic, validation, and data operations. CLI commands invoke these through dependency injection and format results for console output.
 
+When a command needs an access-control decision (e.g. acting on behalf of a specific
+user), it MUST use the component's single `Administrator\Service\AuthorisationService`
+— the same one admin/Site/API use — not a fresh `$user->authorise()` call. Resolve it
+via `bootComponent('com_example')->getContainer()->get(AuthorisationService::class)` and
+pass the target `User` explicitly (CLI has no session identity): `$auth->canModerate($targetUser)`.
+Pattern: `includes/joomla-authorisation-service-pattern.md`.
+
 This approach:
 - Eliminates code duplication of data access and business logic
 - Ensures consistency between Admin UI, Site, API, and CLI contexts

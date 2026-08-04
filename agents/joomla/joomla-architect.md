@@ -214,6 +214,33 @@ When designing services, document:
 
 Store in: `mcp__serena__write_memory("architecture-{ext}-service-layer", {...})`
 
+### Single Point of Authorisation — AuthorisationService
+
+Every component that exposes operations to more than one context (admin, API, CLI,
+plugins) MUST centralise **all** access-control decisions in one
+`Administrator\Service\AuthorisationService`. This is the ACL counterpart of the
+Service Layer principle: business logic lives once in a Service; authorisation logic
+lives once in the AuthorisationService. No `$user->authorise()` calls belong anywhere
+else.
+
+Design it with three tiers of method:
+1. **Primitives** — `authoriseItem($action, $itemId)` and `authoriseComponent($action)`,
+   thin wrappers over `User::authorise()` against the per-item and component assets.
+2. **`assert*` wrappers** — throwing twins (`NotAllowed`, 403) for controllers/API to
+   enforce without an `if` at the call site.
+3. **Composite checks** — domain-language methods that encode owner cascades
+   (`edit`/`edit.own`, `delete`/`delete.own`, taking the row's `created_by`), multi-action
+   ORs, and trusted service-to-service key checks.
+
+This is the **one Service that injects no DataModel** — it performs zero data access;
+permission decisions go through Joomla's ACL engine, not SQL. Register it as a bare
+`new AuthorisationService()`. Design its action strings and asset names to match the
+ACL matrix (Phase 6) and `access.xml`.
+
+Full pattern and reference implementation: `includes/joomla-authorisation-service-pattern.md`.
+
+Store in: `mcp__serena__write_memory("architecture-{ext}-authorisation", {...})`
+
 ---
 
 ## DRY Principle & Layered Extension Architecture
@@ -653,6 +680,12 @@ Design:
 - Custom actions beyond Joomla core
 - access.xml structure
 - View-level access integration
+- The AuthorisationService as the single enforcement point for this matrix: every
+  action string and per-item asset name in access.xml maps to exactly one method on
+  Administrator\Service\AuthorisationService, consumed identically by admin/API/CLI.
+  Document the method-per-action mapping here so builders don't scatter authorise()
+  calls. See includes/joomla-authorisation-service-pattern.md and the
+  Service Layer section above.
 
 Store: mcp__serena__write_memory("architecture-{ext}-acl-matrix", ...)
 ```

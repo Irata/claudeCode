@@ -459,6 +459,13 @@ class TrolleyDataModel extends BaseDatabaseModel
 - Documented exceptions (bulk deletes, atomic increments) stay as direct SQL **within DataModels**
 - Services are **reused by all contexts** (Admin, Site, API, CLI)
 - Services are **registered in the DI container** for dependency injection
+- **Authorisation is a Service too** — centralise every `$user->authorise()` call in one
+  `Administrator\Service\AuthorisationService` (the single point of authorisation). It is
+  the one Service that injects **no** DataModel (ACL checks use `User::authorise()`, not
+  SQL) and registers as a bare `new AuthorisationService()`. Controllers call its
+  `assert*()` methods to enforce (throws `NotAllowed`/403); views call its `can*()`
+  methods to show/hide UI. Never scatter authorise() calls across controllers/models/
+  views. Pattern: `includes/joomla-authorisation-service-pattern.md`.
 
 ### 2. Service Provider (`services/provider.php`)
 Register all services, factories, and the extension class:
@@ -498,6 +505,9 @@ $container->set(CheckoutService::class, fn(Container $c) => new CheckoutService(
     $c->get(OrderDataModel::class),
     $c->get(EmailService::class),
 ));
+
+// AuthorisationService — single point of authorisation, no dependencies (no data access)
+$container->set(AuthorisationService::class, fn(Container $c) => new AuthorisationService());
 ```
 
 **Follow patterns from**: `includes/joomla-di-patterns.md`

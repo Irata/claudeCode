@@ -139,6 +139,41 @@ class ItemProcessedEvent extends AbstractEvent implements ResultAwareInterface
 }
 ```
 
+> Note above that `getItem()` / `getContext()` read `$this->arguments[...]` **directly**. This is
+> mandatory, not stylistic — see the recursion trap below.
+
+#### ⚠️ Custom-getter recursion trap (AbstractEvent magic getters)
+
+`Joomla\CMS\Event\AbstractEvent::getArgument($name)` magic-dispatches to a method named
+`get<Ucfirst($name)>` (and `onGet<Ucfirst($name)>`), treating it as a **value pre-processor** and
+calling it with the raw value. So `getArgument('context')` internally calls `getContext($value)`.
+
+Therefore a custom getter must **never** read its own argument via `getArgument()` — that re-enters
+the magic dispatch and recurses until the stack overflows (PHP 8.3+: *"Maximum call stack size …
+reached. Infinite recursion?"* — a catchable `\Error`, **not** an `\Exception`, so `catch (\Exception)`
+blocks let it sail through).
+
+```php
+// WRONG — infinite recursion: getArgument('context') → getContext() → getArgument('context') → …
+public function getContext()
+{
+    return $this->getArgument('context');
+}
+
+// RIGHT — read the raw argument store directly (the $arguments property is protected/accessible)
+public function getContext()
+{
+    return $this->arguments['context'] ?? null;
+}
+```
+
+**Collision rule:** only names where `get<Ucfirst($argName)>` equals the method name collide.
+`getContext()` (arg `context`) collides; `getStartDate()` does **not** collide with arg `date_start`
+(that would need a method named `getDate_start`). The safe, universal rule: **any event accessor that
+returns one of its own arguments must read `$this->arguments[...]` directly, never `getArgument()`.**
+The magic-getter mechanism is also deprecated (removed in Joomla 7), so prefer plain direct-read
+accessors and do not rely on `get<Name>` pre-processing hooks.
+
 #### Dispatching Custom Events from Components
 ```php
 <?php
@@ -233,3 +268,6 @@ public function handleAfterSave(AfterSaveEvent $event): void
 5. **Don't throw exceptions** in event handlers unless the operation must be blocked
 6. **Use ResultAwareInterface** when plugins need to return data to the dispatcher
 7. **Document custom events** with PHPDoc for discoverability
+8. **Custom getters read `$this->arguments[...]` directly, never `getArgument()`** — a getter named
+   `get<ArgName>()` that calls `getArgument()` for that same argument recurses infinitely via
+   AbstractEvent's magic pre-processor dispatch (see the recursion-trap callout above)

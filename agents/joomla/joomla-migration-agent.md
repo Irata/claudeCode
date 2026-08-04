@@ -111,6 +111,10 @@ Verify all changes compile and follow Joomla 5 conventions.
 | Static helper calls | `\bHelper::` static calls | Use HelperFactory pattern |
 | Non-PSR-4 class files | Files not under `src/` directory | Restructure to PSR-4 layout |
 | Old event parameters | `function on[A-Z]\w+\(` with untyped params | Use typed event classes |
+| `Factory::getDbo()` | `Factory::getDbo\(` | `Factory::getContainer()->get(DatabaseInterface::class)` (`use Joomla\Database\DatabaseInterface;`) |
+| `Table::set()` / `Table::get()` | `->(set\|get)\(\s*['"]` on a `Table` (often after `->load(`) | Direct property access — `$table->field = $value;` (safe once `load()`/`bind()` populated it). Do NOT flag `Registry::set()`. |
+| Raw `new \DateTime()` | `new \\?DateTime\(` | `Factory::getDate($t, $tz)`; for local/site time use `->format($fmt, true)` — omitting the `true` coerces output to UTC |
+| Hardcoded timezone | literal tz string (e.g. `'Australia/Melbourne'`) in `new \DateTime`/`Factory::getDate` | `$app->get('offset', 'UTC')` (site) or `$user->getParam('timezone', ...)` (per-user) |
 
 ### LOW: Convention Updates
 
@@ -120,6 +124,39 @@ Verify all changes compile and follow Joomla 5 conventions.
 | Missing `#[Override]` | Overridden methods without attribute | Add `#[Override]` attribute |
 | Unordered `use` statements | — | Sort alphabetically |
 | Missing `defined('_JEXEC')` | Files without `_JEXEC` check | Add file protection |
+
+## Plugin Event-System Modernization — Backward-Compatibility Critical
+
+Migrating a plugin's legacy `on*` listeners to `SubscriberInterface` is **not a safe blind auto-fix** — it changes how events are dispatched and can silently break callers that use `$app->triggerEvent('onX', [...])` and read the returned result array. Always report these as **MEDIUM with a manual-review flag**, and when fixing, apply the full backward-compatible recipe below. **Never change the event-name keys** — callers depend on them.
+
+### Why callers break (verified against Joomla 5 core)
+
+- Legacy `CMSPlugin` auto-registration wraps `on*` methods and copies each method's **return value** into the event's `result` argument, which is what `triggerEvent()` returns. Once a method becomes a modern subscriber (receives the `Event`), its **return value is no longer auto-collected** — a bare `return $value;` no longer reaches callers.
+- An event name not in Joomla's event-class map resolves to the base `Joomla\Event\Event`, which does **not** implement `ResultAwareInterface` — so `addResult()` alone is insufficient for these callers.
+
+### Backward-compatible migration recipe
+
+1. **Implement `SubscriberInterface` + `getSubscribedEvents()`**, keeping event-name keys identical to what callers dispatch.
+2. **Positional args**: a subscriber method receives the `Event`; there is no arg unpacking. For `triggerEvent('onX', [$sid])`, read `$event->getArgument('0')`. Flag/rewrite handlers still declaring positional scalar params (`public function onX($sid)`).
+3. **Publish results both ways** — via `ResultAwareInterface::addResult()` when supported, else append to the `result` argument for plain-`Event` callers, and retain the direct `return` for in-process callers:
+
+```php
+private function publishResult(Event $event, $result): void
+{
+    if ($event instanceof ResultAwareInterface) {
+        $event->addResult($result);
+        return;
+    }
+    $results   = (array) $event->getArgument('result', []);   // B/C for plain Joomla\Event\Event
+    $results[] = $result;
+    $event->setArgument('result', $results);
+}
+```
+
+4. **Type declarations cautiously**: do not add non-nullable scalar hints to params sourced from `$this->params->get(...)` (returns `null` when unset → `TypeError`). Type the return, not those params. In namespaced files write `@throws \Exception` (bare `Exception` resolves to a non-existent namespaced class).
+5. **Resilience (optional but recommended)**: wrap external/remote I/O in `try/catch (\Throwable)`, degrade into the shape the existing flow already handles, and log via `Joomla\CMS\Log\Log::add()` — optionally gated behind an opt-in plugin param with a guarded, lazily-registered logger.
+
+**Detection**: `search_for_pattern("extends CMSPlugin")` → check for `implements SubscriberInterface` + `getSubscribedEvents`; then check whether any handler returns a value consumed by `triggerEvent()` callers but never calls `addResult()` / republishes to `result`.
 
 ## Manifest XML Migration
 

@@ -415,7 +415,8 @@ Before reviewing code, ALWAYS load architecture blueprints to understand the int
 | **Duplicate Validation Rules** | Save logic duplicated in Site/API controllers | Same `$this->validate($data)` checks across controllers | Move to Admin model, call `parent::save()` |
 | **Duplicate Filtering** | Site filters published state; same logic in API | `$query->where('state = 1')` in multiple places | Add to Admin model's `populateState()`, inherit in Site/API |
 | **Duplicate Form Loading** | Site and API both load and process same form | Identical `getForm()` implementations | Call Admin model's `getForm()` from all layers |
-| **Duplicate ACL Checking** | ACL validation repeated in Site and Admin controllers | Same `$this->getApplication()->getIdentity()->authorise()` calls | Implement once in Admin controller, inherit/call from Site |
+| **Duplicate ACL Checking** | ACL validation repeated in Site and Admin controllers | Same `$this->getApplication()->getIdentity()->authorise()` calls | Centralise in one `Administrator\Service\AuthorisationService` (single point of authorisation); all contexts call its `can*()`/`assert*()` methods. See `includes/joomla-authorisation-service-pattern.md` |
+| **Scattered `authorise()` calls** | Raw `$user->authorise()` in controllers/models/views/API instead of the AuthorisationService | Any `->authorise(` outside `AuthorisationService` | Move the check into an `AuthorisationService` method and call that. Owner cascades (`edit.own`/`delete.own`) belong there too, implemented once |
 | **Duplicate Data Transformation** | Same field mapping in multiple models/views | Converting database fields identically in Site and Admin | Create shared helper or put in base model method |
 
 #### **CRITICAL — Missing Inheritance (Layers Not Extending)**
@@ -545,10 +546,13 @@ When reviewing multiple layers, use Serena to search for duplicated patterns:
    - Should find in Admin forms or Admin model
    - Should NOT find duplicate in Site/API/CLI
 
-4. Search for duplicate ACL checks:
-   mcp__serena__search_for_pattern("authorise\('core")
-   - Should find in Admin controller
-   - Should find in Site controller calling parent or extending
+4. Search for duplicate/scattered ACL checks:
+   mcp__serena__search_for_pattern("->authorise\(")
+   - Should find ONLY inside Administrator\Service\AuthorisationService (the single
+     point of authorisation) — any `->authorise(` in controllers/models/views/API/CLI
+     is a violation; the check belongs on an AuthorisationService method.
+   - Confirm one AuthorisationService exists and every context calls its can*()/assert*()
+     methods. See includes/joomla-authorisation-service-pattern.md.
 
 5. Identify files that should be extending but aren't:
    mcp__serena__find_symbol("class ItemModel")
@@ -1104,6 +1108,23 @@ Joomla resolves MVC and form-field names via `ucfirst(strtolower($name))` — on
 - **`jexit()`**: Deprecated since 4.0, removed in 6.0. Flag any usage. Use `$this->checkToken()` in controllers or throw an exception.
 - **`Session::checkToken() || jexit()`**: The entire pattern is deprecated. Replace with `$this->checkToken()`.
 - **`$this->get('...')` in views**: Deprecated in 5.3.0, removed in 7.0. Flag ALL occurrences of `$this->get('Items')`, `$this->get('Item')`, `$this->get('Pagination')`, `$this->get('State')`, `$this->get('Form')`, `$this->get('FilterForm')`, or any other `$this->get('PropertyName')` call in HtmlView classes. Replace with `$model = $this->getModel(); $model->getItems();` etc.
+
+### Plugin Event-System Modernization (Joomla 5.x)
+
+Flag legacy plugin event patterns and verify that modernizations preserve backward compatibility for callers that dispatch via `$app->triggerEvent('onX', [...])`.
+
+- **`CMSPlugin` without `SubscriberInterface`**: Flag any plugin Extension class that `extends CMSPlugin` but does not `implements SubscriberInterface` while defining public `on*` handler methods. Legacy auto-registration is deprecated (`"The plugin should implement SubscriberInterface"`).
+  - **Fix**: Implement `SubscriberInterface` + `getSubscribedEvents()`. **Keep event-name keys identical** to what callers already dispatch — that is what preserves B/C. Detection: `search_for_pattern("extends CMSPlugin")` then check for `implements SubscriberInterface` and a `getSubscribedEvents` method.
+- **Subscriber method reading positional args wrong**: A `SubscriberInterface` handler receives the `Event` object — legacy argument unpacking is gone. For an event dispatched as `triggerEvent('onX', [$arg])`, the value is `$event->getArgument('0')`. Flag migrated handlers that still declare positional scalar params (e.g. `public function onX($sid)`) instead of `Event $event`.
+- **Modern listener returns a result but never publishes it**: A modern (Event-typed / subscriber) listener's **return value is NOT auto-collected** into the event result set. If callers read the result array (e.g. `$results['0']`), a bare `return $value;` silently breaks them. Flag handlers that return a value where callers consume `triggerEvent()` results but never call `addResult()`.
+  - **Fix**: publish via `ResultAwareInterface::addResult()` when the event supports it, else append to the `result` argument (B/C for the base `Joomla\Event\Event` that unmapped event names resolve to), and retain the direct `return` for in-process callers. Verify the fallback exists — `addResult()` alone is insufficient for plain-`Event` callers.
+
+### Deprecated APIs — Database, Table, Date (Joomla 5.x)
+
+- **`Factory::getDbo()`**: Deprecated. Flag any usage. **Fix**: `Factory::getContainer()->get(DatabaseInterface::class)` (`use Joomla\Database\DatabaseInterface;`). Detection: `search_for_pattern("Factory::getDbo\(")`.
+- **`Table::set()` / `Table::get()`**: Deprecated. Flag `->set('field', ...)` / `->get('field')` on a `Table` object (commonly after `->load(...)`). **Fix**: direct property access — `$table->field = $value;` — which is safe once `load()`/`bind()` has populated the property. Do not confuse with `Registry::set()` (not deprecated).
+- **`Date::format()` UTC coercion**: `Date::format($fmt, $local = false)` forces UTC output when `$local` is falsy. Flag `->format('...')` on a `Joomla\CMS\Date\Date` (incl. `Factory::getDate(...)->format(...)`) where local/site time is intended but the second argument is omitted. **Fix**: pass `true` — `->format('H:i', true)`.
+- **Hardcoded timezone**: Flag literal timezone strings (e.g. `'Australia/Melbourne'`) in `new \DateTime(...)` / `Factory::getDate(...)`. **Fix**: use the configured timezone `$app->get('offset', 'UTC')` (site) or `$user->getParam('timezone', ...)` (per-user).
 
 ### Filter Form Patterns
 - **`fullordering` field in filter XML**: Flag any `<field name="fullordering"` in `filter_*.xml` files. Column headings provide sorting via `HTMLHelper::_('searchtools.sort', ...)` — the fullordering dropdown is redundant. The `<fields name="list">` section should only contain the `limit` (limitbox) field.

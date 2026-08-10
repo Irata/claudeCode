@@ -557,6 +557,83 @@ KEY `idx_lft` (`lft`)
 - Add `use DebugErrorAwareTrait;` as the first statement inside the class body
 - BaseDatabaseModel subclasses (DataModels, DashboardModel) do NOT need the trait
 
+### Sync Save Errors MUST Carry the Offending Record
+
+Any save loop that reports its errors to com_synclog (via `EventbusService::amendLastRun()`) MUST
+annotate each error with the record that failed. A bare `$table->getError()` is not diagnosable
+after the fact.
+
+**Why.** Drivers name the *column* but never the *row*:
+
+> `Out of range value for column 'unit_cost' at row 1`
+
+"Row 1" is the row within that single-row statement, not a position in the import — it is always 1
+and always useless. By the time the message reaches com_synclog the run is over and the remote
+payload is gone, so there is nothing left to work back from. Reproducing means re-running the whole
+pull and hoping the same record comes back.
+
+```php
+// WRONG — names a column, identifies no record
+$errors[] = $table->getError();
+
+// WRONG — identifies the record but not the value that broke it
+$errors[] = 'Item ' . $record->remote_record_id . ': ' . $table->getError();
+
+// CORRECT — error, record identity, offending value, then the payload
+$errors[] = $this->describeSaveError((string) $table->getError(), $record, $table_name);
+```
+
+**Reference implementation.** Add this once per component and call it from every save loop:
+
+```php
+    private const ERROR_PAYLOAD_LIMIT = 1024;
+
+    protected function describeSaveError(string $error, object $record, string $label): string {
+        $error = trim($error) ?: 'The record could not be saved and no error was reported.';
+
+        $context = [
+            $label,
+            'remote_record_id=' . ($record->remote_record_id ?? 'n/a'),
+        ];
+
+        // Lead with the column the driver named: the payload below is capped, and this is
+        // exactly the value that would otherwise be truncated away.
+        if (preg_match("/column '([^']+)'/i", $error, $matches) && property_exists($record, $matches[1])) {
+            $context[] = $matches[1] . '=' . json_encode($record->{$matches[1]});
+        }
+
+        // JSON_PARTIAL_OUTPUT_ON_ERROR so a single malformed field still yields a usable payload
+        // rather than collapsing the whole annotation to nothing.
+        $payload = json_encode($record, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+
+        if ($payload !== false) {
+            $payload = mb_strlen($payload) > self::ERROR_PAYLOAD_LIMIT
+                ? mb_substr($payload, 0, self::ERROR_PAYLOAD_LIMIT) . '…(truncated)'
+                : $payload;
+        }
+
+        return sprintf('%s [%s] %s', $error, implode(' ', $context), $payload ?: '');
+    }
+```
+
+Yielding:
+
+```
+Out of range value for column 'unit_cost' at row 1 [#__purchase_orders_line remote_record_id=1042PO12345 unit_cost=123456.78] {"remote_record_id":"1042PO12345",…}
+```
+
+**Rules.**
+- **Where it lives**: the component's model `LocalTraits` when more than one class runs a save loop;
+  on the model class itself when there is only one. Do not duplicate it per model.
+- **Always cap the payload.** Error lists are capped at ten, so ten uncapped records would overflow
+  com_synclog's storage. 1024 chars per record is the default.
+- **State the named column's value before the payload**, never only inside it — the cap must not be
+  able to remove the one value being complained about.
+- **Cast the table's error**: `(string) $table->getError()` — `getError()` returns `false` when
+  nothing was set, and the parameter is typed `string`.
+- Keep any existing entity label (`'Item'`, `'Stock request'`) by passing it as `$label`; it becomes
+  the first context field rather than a prefix.
+
 ### DataModel Pattern
 - DataModels extend `BaseDatabaseModel`, named `{Entity}DataModel.php`
 - DataModels are the **sole database access layer** for Service classes

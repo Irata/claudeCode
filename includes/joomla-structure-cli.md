@@ -180,6 +180,10 @@ Plugin*), **nothing here is transcribed by hand**. A route table has to be mirro
 `onBeforeApiRoute()` and can drift from it; a command is an object that already knows its own name,
 description, arguments and options. Read them off the command and drift becomes impossible.
 
+The read-only-field mechanics, the baseline every plugin documents, and the generic verification
+harness live in `includes/joomla-self-documenting-plugin.md`. This section covers only what is
+specific to commands.
+
 #### 1. One registry, two consumers (`src/Console/CommandRegistry.php`)
 
 The registry is what makes the screen trustworthy: the listener and the field walk the same list,
@@ -447,11 +451,9 @@ with the same `catch (\Throwable) { return []; }` degradation.
 
 #### 5. Language strings
 
-All prose belongs in the `.ini`, never in the PHP. `Text::_()` output is **not** escaped by the
-field, so simple markup renders; escape only the *dynamic* values, via the `e()` helper.
-
-The `.sys.ini` description is static and cannot enumerate arguments, so give it a one-line summary
-naming the commands — that is what the Plugins manager list and the install screen show.
+Prose in the `.ini`, dynamic values escaped through `e()`, and a one-line `.sys.ini` summary
+naming the commands — see `joomla-self-documenting-plugin.md` → *Language strings*. The
+command-specific keys:
 
 ```ini
 PLG_CONSOLE_EXAMPLE_COMMANDS_LABEL="Available Commands"
@@ -474,10 +476,11 @@ PLG_CONSOLE_EXAMPLE_COMMANDS_UNAVAILABLE="The commands cannot be listed — the 
 
 #### Trap 1 — a custom field type that does not resolve falls back to a text input, silently
 
-Identical to the webservices case: a missing or wrong `addfieldprefix` resolves `type="commands"`
-to `Joomla\CMS\Form\Field\TextField` and renders a stray text box, with no error from a lint, a
-syntax check, or an install. Full explanation in `joomla-structure-api.md` → *Trap 1*. Always
-render the field once and assert the resolved class.
+Generic to every documentation field: a missing or wrong `addfieldprefix` resolves
+`type="commands"` to `Joomla\CMS\Form\Field\TextField` and renders a stray text box, with no error
+from a lint, a syntax check, or an install. Full explanation in
+`joomla-self-documenting-plugin.md` → *Trap 1*. Always render the field once and assert the
+resolved class.
 
 #### Trap 2 — `getProcessedHelp()` builds its example from `$_SERVER['PHP_SELF']`
 
@@ -512,11 +515,10 @@ three options that are actually the command's own. Read the definition as it com
 
 #### Verifying it (build the form from the real manifest)
 
-Use the harness in `joomla-structure-api.md` → *Verifying it*, with two changes:
-
-- **Drop the URL assertions and the `Uri::root()` reset.** This field never touches `Uri`, so the
-  administrator root-reset dance that harness performs is irrelevant here.
-- **Add the drift assertion** — the check the webservices version cannot make:
+Use the generic harness in `joomla-self-documenting-plugin.md` → *Verifying it* for the bootstrap,
+the field-resolution check and the untranslated-key check. This field never touches `Uri`, so none
+of the webservices field's URL handling applies. Add the drift assertion — the check the
+webservices version cannot make:
 
 ```php
 $html = $form->renderField('commands', 'params');

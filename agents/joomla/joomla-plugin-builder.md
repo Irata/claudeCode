@@ -48,6 +48,7 @@ You are a **Joomla Plugin Builder**. You create plugins across all Joomla plugin
 
 2. Review reference includes:
    - includes/joomla-structure-plugin.md — plugin structure reference
+   - includes/joomla-self-documenting-plugin.md — REQUIRED options-screen reference (all groups)
    - includes/joomla-events-system.md — CRITICAL: events system reference
    - includes/joomla-di-patterns.md — plugin service provider patterns
    - includes/joomla-depreciated.md
@@ -118,6 +119,28 @@ final class {Name} extends CMSPlugin implements SubscriberInterface
     }
 }
 ```
+
+## Self-Documentation — REQUIRED for Every Plugin, Every Group
+
+A plugin has no front end, no menu item and no visible UI. Unless it explains itself, the only way
+to find out what it does is to read its source — so **every plugin you create or revise ships a
+read-only reference in its own options screen**, not just the ones that register routes or
+commands.
+
+Baseline, whatever the group: what the plugin does, the events it subscribes to and when each
+fires, anything it changes that is not obvious, what stops happening when it is disabled, and what
+it depends on. Groups that register things with the application add those on top — see the
+per-group sections below.
+
+**Derive it, do not transcribe it.** `SubscriberInterface::getSubscribedEvents()` is `static`, so
+the field can enumerate the plugin's own events without instantiating anything, and that list can
+never drift. Key the "when it fires" prose in the `.ini` by event name, and a subscription added
+without documentation shows up immediately as an untranslated key on the screen.
+
+Mechanics, the field shape, traps and the verification harness:
+`includes/joomla-self-documenting-plugin.md`. Wrap anything reaching outside the plugin in
+`try`/`catch (\Throwable)` — a plugin outliving its component must degrade to a warning, never
+fatal the options screen.
 
 ## Plugin Groups & Common Events
 
@@ -196,7 +219,8 @@ Three failure modes to check for, none of which a lint or an install will surfac
 
 - **A custom field type that does not resolve silently becomes a text input.** Wrong or missing
   `addfieldprefix` renders a stray text box instead of erroring. Render the field once and assert
-  the resolved class is yours, not `Joomla\CMS\Form\Field\TextField`.
+  the resolved class is yours, not `Joomla\CMS\Form\Field\TextField`. Generic to every
+  documentation field — `includes/joomla-self-documenting-plugin.md` → *Trap 1*.
 - **Never call `getProcessedHelp()`.** It builds `%command.full_name%` from `$_SERVER['PHP_SELF']`,
   which on an administrator web request yields `/administrator/index.php example:import` — a
   copy-pasteable instruction that cannot work. Use `getHelp()` and substitute the placeholders

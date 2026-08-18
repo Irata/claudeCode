@@ -452,7 +452,6 @@ class ItemController extends ApiController
 ```
 
 **Important:** The Extension class must implement `getContainer()` to expose the DI container. See `includes/joomla-di-patterns.md` for the full pattern.
-```
 
 ### 2. API Views (`api/src/View/`)
 
@@ -550,8 +549,10 @@ read-only reference rendered against the site being looked at — real base URL,
 records — so an integrator can copy a line and have it work rather than reading
 `onBeforeApiRoute()` to find out what exists.
 
-Deliverables (full code samples in `includes/joomla-structure-api.md`, "Self-Documenting
-Webservices Plugin"):
+Shared mechanics — the read-only field shape, language-string rules, the `addfieldprefix` trap and
+the generic harness — are in `includes/joomla-self-documenting-plugin.md`, which also states the
+baseline every plugin documents regardless of group. Deliverables below are route-specific (full
+code samples in `includes/joomla-structure-api.md`, "Self-Documenting Webservices Plugin"):
 
 1. `src/Field/EndpointsField.php` — a `FormField` that stores nothing and renders the routes,
    the auth requirement, each query parameter **and how it fails**, plus live example URLs

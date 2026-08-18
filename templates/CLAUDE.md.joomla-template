@@ -78,6 +78,8 @@ All extensions in this project use the vendor namespace `{{VENDOR_NAMESPACE}}`:
 ### Plugin
 @includes/joomla-structure-plugin.md
 
+@includes/joomla-self-documenting-plugin.md
+
 ### Module
 @includes/joomla-structure-module.md
 

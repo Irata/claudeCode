@@ -88,7 +88,8 @@ This means every agent and conversation in the project automatically has access 
 | **joomla-devel-environment.md** | Development environment setup — directory paths, source mapping, and local server configuration |
 | **joomla-structure-component.md** | Reference directory and file structure for Joomla components (administrator and site) |
 | **joomla-structure-module.md** | Reference directory and file structure for Joomla modules |
-| **joomla-structure-plugin.md** | Reference directory and file structure for Joomla plugins, plus the rule that registration plugins publish what they register in their own options screen |
+| **joomla-structure-plugin.md** | Reference directory and file structure for Joomla plugins, plus the rule that every plugin documents itself in its own options screen |
+| **joomla-self-documenting-plugin.md** | The read-only options-screen reference every plugin ships — baseline content, field mechanics, `getSubscribedEvents()` introspection, traps and the verification harness |
 | **joomla-structure-api.md** | Reference directory and file structure for Joomla REST API extensions |
 | **joomla-structure-cli.md** | Reference directory and file structure for Joomla CLI commands, plus the self-documenting console plugin pattern (command reference read from each command's InputDefinition) |
 | **joomla-di-patterns.md** | Dependency injection patterns — service providers, container registration, and factory patterns |

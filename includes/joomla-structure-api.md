@@ -163,6 +163,10 @@ read-only reference rendered against **the site being looked at**: this site's b
 worked examples naming resources that actually exist here. Placeholder text (`https://yoursite/…`)
 is worth far less — the point is that an integrator can copy a line and have it work.
 
+The read-only-field mechanics, the baseline every plugin documents, and the generic verification
+harness live in `includes/joomla-self-documenting-plugin.md`. This section covers only what is
+specific to routes.
+
 #### 1. The field class (`src/Field/EndpointsField.php`)
 
 ```php
@@ -339,9 +343,8 @@ list change is needed beyond the `<config>` block.
 
 #### 3. Language strings
 
-All prose belongs in the `.ini`, never in the PHP. `Text::_()` output is **not escaped** by the
-field, so simple markup (`<code>`, `&rarr;`, `&lt;`) renders — which is what you want for
-inline examples. Escape only the *dynamic* values, via the `e()` helper above.
+Prose in the `.ini`, dynamic values escaped through `e()` — see
+`joomla-self-documenting-plugin.md` → *Language strings*. The route-specific keys:
 
 ```ini
 PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_LABEL="Available Endpoints"
@@ -361,10 +364,10 @@ PLG_WEBSERVICES_EXAMPLE_ENDPOINTS_AUTH="Every route requires a Joomla API token 
 
 #### Trap 1 — a custom field type that does not resolve falls back to a text input, silently
 
-If `addfieldprefix` is missing or the namespace is wrong, Joomla does **not** error. It resolves
-`type="endpoints"` to `Joomla\CMS\Form\Field\TextField` and renders a stray text box on the
-options screen. Nothing in a lint, a syntax check, or an install will tell you. **Always render
-the field once and assert the resolved class** (harness below).
+Generic to every documentation field: a missing or wrong `addfieldprefix` resolves
+`type="endpoints"` to `Joomla\CMS\Form\Field\TextField` and renders a stray text box, with no
+error from a lint, a syntax check, or an install. Full explanation and why it cannot be caught
+statically: `joomla-self-documenting-plugin.md` → *Trap 1*.
 
 #### Trap 2 — `Uri::root()` and the administrator root reset
 
@@ -379,48 +382,21 @@ run. Two consequences:
 
 #### Verifying it (build the form from the real manifest)
 
-Rendering programmatically catches both traps. Run from the Joomla root:
+Use the generic harness in `joomla-self-documenting-plugin.md` → *Verifying it* for the bootstrap,
+the field-resolution check and the untranslated-key check. Two additions are specific to this
+field, because it is the only one that emits URLs:
+
+**Reproduce the administrator root reset** before rendering, or the harness measures a state that
+never occurs (Trap 2):
 
 ```php
-// Pretend to be an administrator web request.
-$_SERVER['HTTP_HOST']   = 'example.local';
-$_SERVER['SCRIPT_NAME'] = '/administrator/index.php';
-$_SERVER['REQUEST_URI'] = '/administrator/';   // the DIRECTORY — see note below
-$_SERVER['HTTPS']       = 'on';
-
-\define('_JEXEC', 1);
-\define('JPATH_BASE', 'E:/www/example');
-require_once JPATH_BASE . '/includes/defines.php';
-require_once JPATH_BASE . '/includes/framework.php';
-
-$container = \Joomla\CMS\Factory::getContainer();
-$container->alias('session', 'session.cli')
-    ->alias(\Joomla\Session\SessionInterface::class, 'session.cli');
-
-$app = $container->get(\Joomla\CMS\Application\ConsoleApplication::class);
-\Joomla\CMS\Factory::$application = $app;
-
-// A real application registers extension namespaces during execute(); without this every
-// extension class silently fails to autoload and the field falls back to TextField.
-\JLoader::register('JNamespacePsr4Map', JPATH_LIBRARIES . '/namespacemap.php');
-(new \JNamespacePsr4Map())->load();
-
-// Reproduce AdministratorApplication::doExecute()'s root reset (see Trap 2).
+// Reproduce AdministratorApplication::doExecute()'s root reset.
 \Joomla\CMS\Uri\Uri::root(null, rtrim(\dirname(\Joomla\CMS\Uri\Uri::base(true)), '/\\'));
+```
 
-$app->getLanguage()->load('plg_webservices_example', JPATH_BASE . '/plugins/webservices/example');
+**Assert the emitted URLs**:
 
-$manifest = simplexml_load_file(JPATH_BASE . '/plugins/webservices/example/example.xml');
-$xml      = '<?xml version="1.0"?><form>' . $manifest->config->fields->asXML() . '</form>';
-$form     = \Joomla\CMS\Form\Form::getInstance('t' . mt_rand(), $xml, ['control' => 'jform']);
-
-$field = $form->getField('endpoints', 'params');
-echo $field ? 'resolved as ' . $field::class . "\n" : "FAIL: did not resolve\n";  // Trap 1
-
-$html = $form->renderField('endpoints', 'params');
-preg_match_all('/PLG_WEBSERVICES_[A-Z_]+/', $html, $m);
-echo $m[0] ? "FAIL untranslated: " . implode(', ', array_unique($m[0])) . "\n" : "all keys resolved\n";
-
+```php
 preg_match_all('#https?://[^<\s"]+#', $html, $u);
 print_r(array_unique($u[0]));   // must have no '/administrator' segment
 ```
@@ -430,8 +406,9 @@ print_r(array_unique($u[0]));   // must have no '/administrator' segment
 > `/administrator/index.php` makes the two branches disagree and every URL gains a segment —
 > a harness artefact that looks exactly like a code bug.
 
-**Pass criteria:** the field resolves to your own class (not `TextField`), no `PLG_…` constants
-survive in the output, and the emitted URLs match what a client actually calls.
+**Pass criteria:** the generic ones (field resolves to your own class, no surviving `PLG_…`
+constants) plus — specific to this field — the emitted URLs match what a client actually calls and
+carry no `/administrator` segment.
 
 #### Keeping it honest
 

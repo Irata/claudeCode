@@ -45,18 +45,22 @@ entry. This attribute tells the installer the plugin's `element` name for the
 - For smaller code bases keep everything in a single file in the extension_name.php
 - For larger more complex code bases, separate the code in several classes in /src
 
-### Registration Plugins Must Publish What They Register
+### Every Plugin Documents Itself
 
-A plugin whose purpose is to *register* things with the application — API routes (`webservices`),
-CLI commands (`console`), scheduled task types (`task`) — usually has no settings of its own, so
-its options tab is free space. Fill it with a read-only reference to what it registered, rendered
-against this installation. An administrator reading the Plugins manager should not have to read
-source or open a shell to answer "what does this add?".
+A plugin has no front end, no menu item and no visible UI, so unless it explains itself the only
+way to find out what it does is to read its source. **Every plugin therefore ships at least basic
+documentation in its own options screen** — what it does, the events it listens for, what it
+changes, and what stops happening when it is disabled.
+
+Plugins that register things with the application document those on top of the baseline: API routes
+(`webservices`), CLI commands (`console`), task types (`task`).
 
 Implement it as a `FormField` that stores nothing, declared in a `<config><fields name="params">`
 block whose `<fieldset>` carries `addfieldprefix`. Derive the content from the extension itself
-wherever the data already exists as objects — a hand-transcribed list drifts from what is actually
-registered.
+wherever the data already exists as objects — the event list is free, because
+`getSubscribedEvents()` is static — since a hand-transcribed list drifts from what the plugin
+actually does.
 
+- Mechanics, baseline and verification: `includes/joomla-self-documenting-plugin.md`
 - Webservices routes: `includes/joomla-structure-api.md` → *Self-Documenting Webservices Plugin*
 - Console commands: `includes/joomla-structure-cli.md` → *Self-Documenting Console Plugin*

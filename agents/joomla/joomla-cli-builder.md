@@ -480,7 +480,8 @@ plugin created or revised. When the plugin itself is being built, that work belo
 renders.
 
 Reference: `includes/joomla-structure-cli.md` for full registration patterns and the
-"Self-Documenting Console Plugin" reference.
+"Self-Documenting Console Plugin" reference; `includes/joomla-self-documenting-plugin.md` for the
+shared field mechanics and the baseline every plugin documents.
 
 ### Output Standards
 - Use `SymfonyStyle` for all output formatting

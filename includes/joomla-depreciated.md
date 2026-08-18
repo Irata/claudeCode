@@ -475,13 +475,13 @@ $wa->useScript('multiselect');
 HTMLHelper::_('bootstrap.tooltip', '.hasTooltip');
 ```
 
-### `defined('JPATH_PLATFORM') or die` (Joomla 3 Guard Constant)
+### `defined('JPATH_PLATFORM') or die` (REMOVED in Joomla 6 — silent white screen)
 **Pattern**: Using `JPATH_PLATFORM` as the entry guard constant
-**Risk**: Medium — `JPATH_PLATFORM` is a legacy constant from the Joomla Platform era
+**Risk**: 🚨 **CRITICAL on Joomla 6** — the constant no longer exists, so the guard is always false and the file `die()`s on load
 
 #### Detection Pattern
 ```php
-// WRONG — legacy guard constant
+// WRONG — guard constant removed in Joomla 6
 defined('JPATH_PLATFORM') or die;
 ```
 
@@ -490,6 +490,22 @@ defined('JPATH_PLATFORM') or die;
 // CORRECT — use the standard Joomla execution guard
 \defined('_JEXEC') or die;
 ```
+
+#### Why This Matters — the failure is invisible
+
+`JPATH_PLATFORM` was deprecated in Joomla 4 and **removed in Joomla 6**. On a Joomla 6 site `defined('JPATH_PLATFORM')` returns false, so `die` fires the instant the file is loaded. Bare `die` produces:
+
+- **no output** — a blank white page, not an error page
+- **exit code 0** — the request looks successful to the web server
+- **no log entry**, and `error_get_last()` returns `null`
+
+Nothing appears even with `error_reporting = maximum` and `display_errors` on, because no error was ever raised. Standard debugging turns up nothing.
+
+**It is invisible on Joomla 5.** The constant is still defined there, so the same file works perfectly. A component can pass every test on a Joomla 5 instance and white-screen on every Joomla 6 site. Symptom to recognise: a blank page when a specific component or view is opened, while the rest of the admin works normally — the `die` fires when Joomla boots that extension.
+
+**Where it hides**: most commonly the component's `Extension/*Component.php` class, since that file is often the oldest in the tree and is loaded on every dispatch of the component.
+
+**Detection**: `grep -rn "JPATH_PLATFORM" <extension-root>` — treat any hit as critical, and check the working tree rather than only committed files, since a stale editor template can reintroduce it.
 
 ### `defined()` vs `\defined()` (Namespace Best Practice)
 **Pattern**: Using `defined()` without leading backslash in namespaced files

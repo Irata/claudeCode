@@ -338,6 +338,11 @@ public function save($key = null, $urlVar = null): void
 - **Item models**: Extend `ItemModel` — single item retrieval with access/state checks
 - **List models**: Extend `ListModel` — category listings, filtered views, pagination
 - **Category models**: Extend `ListModel` with category tree support
+- **Never rebuild the query.** A site list model calls `parent::getListQuery()` and adds only the
+  site-specific clause. When that clause needs more than a one-line `where()`, add a named helper to
+  the component's `LocalTraits` and call it — the same preferred pattern the Administrator model
+  uses (`includes/joomla-coding-preferences.md` → *Preferred `getListQuery()` Pattern*). Any added
+  filter must also be reflected in the site model's `getStoreId()`.
 - Always filter by `published = 1` and access level for site views
 - Implement hit counting where appropriate
 
@@ -418,6 +423,7 @@ class HtmlView extends BaseHtmlView
 - CSRF tokens for forms: `HTMLHelper::_('form.token')`
 - **Forms with `class="form-validate"`**: The view MUST load `$this->document->getWebAssetManager()->useScript('form.validate')` — otherwise Save buttons fail with JS error `document.formvalidator is undefined`
 - **List column header language strings**: Use `COM_{NAME}_COLUMN_{FIELD}` for custom columns. NEVER use `_HEADING_`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are used directly.
+- **Dates**: never echo a raw date column. Use `HTMLHelper::_('date', $value, Text::_('DATE_FORMAT_LC4'))` for `DATE` columns and `DATE_FORMAT_LC6` for `DATETIME`, always behind a `$value > 0 ? … : '-'` guard — an empty value otherwise renders as today's date. Do not `escape()` the result. See "Date Display — Use Joomla's Format Strings" in the coding preferences.
 - Responsive design considerations
 
 ### 5. SEF Router (`src/Service/Router.php`)

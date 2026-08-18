@@ -251,6 +251,8 @@ You are an expert Joomla code reviewer with access to the most current documenta
 - [ ] Database interactions use Joomla's database abstraction layer
 - [ ] Security practices align with current OWASP and Joomla guidelines
 - [ ] Performance considerations addressed according to best practices
+- [ ] Displayed dates go through `HTMLHelper::_('date', …, Text::_('DATE_FORMAT_LC4'|'DATE_FORMAT_LC6'))`, never echoed raw — and each call is guarded (`$value > 0 ? … : '-'`), because an empty value silently renders as **today's date**. API/CSV output is exempt and keeps raw ISO.
+- [ ] `calendar` fields in record forms carry `translateformat="true"` (plus `showtime="true"` and `filter="user_utc"` for `DATETIME` columns)
 
 ### **Quality Metrics:**
 - [ ] No critical security vulnerabilities identified
@@ -418,6 +420,8 @@ Before reviewing code, ALWAYS load architecture blueprints to understand the int
 | **Duplicate ACL Checking** | ACL validation repeated in Site and Admin controllers | Same `$this->getApplication()->getIdentity()->authorise()` calls | Centralise in one `Administrator\Service\AuthorisationService` (single point of authorisation); all contexts call its `can*()`/`assert*()` methods. See `includes/joomla-authorisation-service-pattern.md` |
 | **Scattered `authorise()` calls** | Raw `$user->authorise()` in controllers/models/views/API instead of the AuthorisationService | Any `->authorise(` outside `AuthorisationService` | Move the check into an `AuthorisationService` method and call that. Owner cascades (`edit.own`/`delete.own`) belong there too, implemented once |
 | **Duplicate Data Transformation** | Same field mapping in multiple models/views | Converting database fields identically in Site and Admin | Create shared helper or put in base model method |
+| **Hand-rolled list query clauses** | `ListModel::getListQuery()` | Inline `if (...) { $query->where(...)->bind(...) }` blocks — one per filter — instead of `LocalTraits` helper calls | Refactor to the preferred pattern: `setListOrdering()` → `setPublishedState()` → one `setFilterColumn()` per column → `setFilterSearch()` last. Filters no helper covers get a **new named helper on `LocalTraits`**. See `includes/joomla-coding-preferences.md` → *Preferred `getListQuery()` Pattern* |
+| **Filter applied but not in `getStoreId()`** | `ListModel` | A `filter.X` used in `getListQuery()` with no matching `$id .= ':' . $this->getState('filter.X')` line | Add the line — otherwise cached results leak across filter states |
 
 #### **CRITICAL — Missing Inheritance (Layers Not Extending)**
 
@@ -1172,6 +1176,39 @@ Flag legacy plugin event patterns and verify that modernizations preserve backwa
 
 Reference: `skills/joomla/version-bump/SKILL.md` (conversion), `agents/joomla/joomla-build-agent.md` → "Version Source — Read From the Manifest, Never Duplicated" (rationale), `templates/Phing/` (reference build files).
 
+### Silent-Failure Patterns (blank page, no error, nothing logged)
+
+**Run these greps on every review.** Both defects produce no error output on the machine where they are introduced, so they survive normal testing and surface only on a different Joomla version or a different code path.
+
+- **`defined('JPATH_PLATFORM') or die`** (🚨 CRITICAL): `JPATH_PLATFORM` was deprecated in Joomla 4 and **removed in Joomla 6**. On J6 the guard is always false, so the file `die()`s on load — blank page, **exit code 0**, no log entry, and `error_get_last()` returns `null`. Nothing shows even at `error_reporting = maximum`, because no error is ever raised. It works perfectly on Joomla 5, so the extension can pass a full test pass and white-screen on every J6 site.
+  - **Detection**: `grep -rn "JPATH_PLATFORM" <extension-root>`. Any hit is critical. Check the **working tree**, not just committed files — a stale editor template can reintroduce it into a file whose committed version is correct.
+  - **Most common location**: `src/Extension/*Component.php`, which loads on every dispatch of the component.
+  - **Fix**: `\defined('_JEXEC') or die;`
+  - Reference: `includes/joomla-depreciated.md` → "`defined('JPATH_PLATFORM') or die`".
+- **Unqualified class reference with no matching `use` statement** (🚨 CRITICAL): In a namespaced file, a bare `ComponentHelper::isEnabled(...)` with no import resolves against the *file's own* namespace, giving `Class "Vendor\Component\Foo\Administrator\View\Bar\ComponentHelper" not found` at runtime. Fatal, and only on the code path that reaches the line — so it hides behind conditionals and survives testing.
+  - **Detection**: for each `src/**/*.php` and `tmpl/**/*.php`, collect unqualified `ClassName::`, `new ClassName(`, and `instanceof ClassName` references, then subtract the file's `use` imports (honouring `as` aliases), classes declared in the same namespace, and global/built-in classes. Anything left is unresolved.
+  - **Exclude docblocks and comments** — `@var`, `@param`, and commented-out example code are the dominant false positives. Confirm each hit is on an executing line before reporting it.
+  - Give this extra weight on lines guarded by a condition that was previously always-false: fixing an unrelated bug can unmask a latent missing import.
+
+### Schema Lifecycle Patterns (SQL Install & Updates)
+
+**Check this on every existing project being reviewed or upgraded** — these are wiring and drift defects that no code change surfaces. They stay silent until a customer installs or updates.
+
+- **Missing `<update><schemas>` in the manifest** (🚨 CRITICAL): Flag any extension that has files in `sql/updates/{driver}/` but no `<update><schemas><schemapath>` element in its manifest. `InstallerAdapter::parseQueries()` gates both `setSchemaVersion()` (install) and `parseSchemaUpdates()` (update) on this element, so without it **every schema update ever written is dead code** — the directory is never read.
+  - **Detection**: For each manifest with a sibling `sql/updates/` directory, grep the manifest for `<schemapath`. Also verify the declared path resolves to the actual directory — a stale path fails the same way as a missing block.
+  - **Fix**: report it and run the **`version-bump` skill**, which adds the block and performs the mandatory replay check (step 6). Do not hand-add the block during review: adding it without guarding the back-catalogue converts a dormant problem into a failed, rolled-back update.
+- **Unguarded non-idempotent statements in the update back-catalogue** (⚠️ IMPORTANT): Where the `<update><schemas>` block is newly added — or where `#__schemas` may hold no row for the extension — `parseSchemaUpdates()` falls back to version `'0.0.0'` and replays **every** file oldest-first. Flag `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, and `DROP COLUMN` statements that lack the `/** CAN FAIL **/` marker before the terminating semicolon. A failure here returns `false`, throws `RuntimeException`, and aborts and rolls back the entire update.
+  - `MODIFY`, `CHANGE`, `DROP TABLE IF EXISTS`, and engine/collation conversions are idempotent — do not flag them.
+- **Install script drifted from the update chain** (🚨 CRITICAL): A fresh install pins `#__schemas` straight to the newest update filename, so **update files never run on a fresh install**. `sql/install.*.sql` must therefore be the complete *current* schema, not the original one. Flag any column, index, engine, or collation introduced by an update file that is absent from the install script.
+  - **Detection**: Build the effective schema by replaying the update files in `version_compare` order over the install script's `CREATE TABLE`, then diff. Check column order against each `AFTER` clause, plus index names, `ENGINE`, and `COLLATE`.
+  - **Impact**: fresh and upgraded installs diverge silently. The bug surfaces only on a customer's new site, which is why it survives testing.
+- **Install or uninstall SQL that destroys data** (🚨 CRITICAL): Data tables are removed manually by the administrator, never automatically.
+  - Flag `DROP TABLE` on a data table at the top of `sql/install.*.sql` — reinstalling wipes live data, and it silently defeats any policy of leaving the table in place on uninstall. `CREATE TABLE IF NOT EXISTS` alone is sufficient.
+  - Flag an `<uninstall>` block wired to SQL that drops a data table.
+  - Flag `sql/uninstall.*.sql` referencing tables belonging to a **different** extension — a common copy-paste leftover. Inert while unreferenced, destructive the moment someone wires it up.
+
+Reference: `includes/joomla-coding-preferences.md` → "SQL Update File Management" (manifest wiring, `/** CAN FAIL **/`, install completeness, data preservation), `skills/joomla/version-bump/SKILL.md` (step 6 replay check).
+
 ### File Upload Patterns
 - **Extension-only validation**: File uploads must validate both file extension AND MIME type (via `finfo`). Extension alone is trivially spoofable.
 - **Missing size limits**: All file uploads should enforce a reasonable size limit.
@@ -1182,6 +1219,7 @@ Flag violations of the "Joomla First" principle — always use Joomla's built-in
 - **Repository pattern**: Flag any `*Repository` classes. Joomla uses the Model pattern (`ListModel`, `FormModel`, `AdminModel`, `BaseDatabaseModel`) — no separate Repository layer.
 - **Raw PHP where Joomla provides an equivalent**: Flag `$_GET`/`$_POST`/`$_REQUEST` (use `$app->getInput()`), `$_SESSION` (use `$app->getSession()` or `$app->getIdentity()`), `date()`/`new \DateTime()` (use `new Joomla\CMS\Date\Date()`), `mail()` (use `Factory::getMailer()`), `copy()`/`mkdir()` (use `File::copy()`/`Folder::create()`), `error_log()` (use `Log::add()`), `curl_*()` (use `HttpFactory::getHttp()`).
 - **Non-standard MVC for CRUD pages**: List/form pages MUST use `ListModel`/`AdminModel`/`FormModel` — not custom query classes or ad-hoc data loading.
+- **Monolithic `getListQuery()`**: Flag any `getListQuery()` that builds ordering, published state, search, or column filters inline. The required shape is one `LocalTraits` helper call per concern (`setListOrdering()`, `setPublishedState()`, `setFilterColumn()`, `setFilterSearch()` last), with a `sqlDump()` — never a leftover `$query->dump()` — used for debugging. Also flag `setFilterSearch()` called before other filters: it sets the OR glue for the whole WHERE clause.
 - **Service locator in constructors**: Flag `Factory::getContainer()->get()` inside constructors. Use constructor injection via `services/provider.php` instead.
 - **Config in manifest XML**: Extension configuration parameters MUST be in `config.xml`, NOT embedded as `<config>` blocks in the manifest XML.
 - **Hardcoded user-facing strings**: All user-facing text MUST use `Text::_()` or `Text::sprintf()` with language constants. Flag hardcoded English strings in views, models, and controllers.

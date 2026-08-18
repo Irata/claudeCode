@@ -36,8 +36,7 @@ Every other Service injects DataModels and never touches the database directly
 it performs **no data access at all**. Permission decisions are evaluated through
 Joomla's ACL engine via `User::authorise()`, not through SQL. Therefore it injects
 **nothing** — no DataModel, no `DatabaseInterface`, no `MVCFactoryInterface`. Its only
-inputs are the current identity (resolved from the application) and, for trusted
-service-to-service calls, request headers.
+input is the current identity, resolved from the application.
 
 Because it has no constructor dependencies it can be registered as a bare `new`.
 
@@ -176,81 +175,6 @@ public function checkPermissions(array $actions, ?User $user = null): array
 }
 ```
 
-### Trusted service-to-service requests
-
-When another backend service calls the component's API on behalf of a user (a gateway,
-a companion app), the request carries no logged-in Joomla identity. A shared secret in
-a request header authenticates the **caller** (not an end user), letting trusted
-create/write operations proceed. Keep this logic in the AuthorisationService so the
-"is this a trusted machine call?" question is answered in one place too.
-
-```php
-use Joomla\CMS\Factory;
-
-/**
- * True when the request carries the valid backend service key.
- */
-public function isTrustedServiceRequest(): bool
-{
-    $server   = Factory::getApplication()->getInput()->server;
-    $expected = $this->readServerValue('JOOMLA_API_SERVICE_KEY', $server);
-
-    if ($expected === '') {
-        $expected = trim((string) getenv('JOOMLA_API_SERVICE_KEY'));
-    }
-
-    if ($expected === '') {
-        return false;                       // Not configured → never trust.
-    }
-
-    $provided = $this->readServerValue('HTTP_X_EXAMPLE_SERVICE_KEY', $server);
-
-    if ($provided === '') {
-        return false;
-    }
-
-    return hash_equals($expected, $provided);   // Constant-time compare.
-}
-
-/**
- * Reads a header/server value, honouring CGI's REDIRECT_ prefix.
- */
-private function readServerValue(string $key, $server): string
-{
-    $value = trim((string) $server->get($key, '', 'RAW'));
-
-    if ($value !== '') {
-        return $value;
-    }
-
-    return trim((string) $server->get('REDIRECT_' . $key, '', 'RAW'));
-}
-```
-
-Rules that make this safe:
-
-- **Fail closed** — if the expected key is not configured, return `false`; never treat
-  an unconfigured key as "allow".
-- **`hash_equals()`** — always compare secrets in constant time; never `===`.
-- **`REDIRECT_` fallback** — Apache CGI/FastCGI prefixes forwarded headers with
-  `REDIRECT_`; check both forms via `readServerValue()`.
-- Composite checks consult it first, then fall back to per-user ACL:
-
-  ```php
-  public function canCreateItem(int $categoryId, ?User $user = null): bool
-  {
-      if ($categoryId <= 0) {
-          return false;
-      }
-
-      if ($this->isTrustedServiceRequest()) {
-          return true;                        // Trusted backend caller.
-      }
-
-      return $this->authoriseItem('example.item.create', $categoryId, $user);
-  }
-  ```
-
 ### The `resolveUser()` helper
 
 A single private helper resolves the current identity, so no method repeats the
@@ -287,7 +211,7 @@ $auth->assertCanEditItem($categoryId, $item->created_by);
 // API controller — same service, resolved via bootComponent (separate namespace).
 $auth = $this->app->bootComponent('com_example')
     ->getContainer()->get(AuthorisationService::class);
-$auth->assertCanCreateItem($categoryId);        // honours trusted-service key
+$auth->assertCanCreateItem($categoryId);
 
 // View template — use the bool form to show/hide UI.
 if ($auth->canEditItem($item->catid, $item->created_by)) { /* render edit button */ }
@@ -311,7 +235,9 @@ constructor DI; API controllers, plugins, and CLI commands resolve it with the
 - [ ] Owner cascades (`edit`/`edit.own`, `delete`/`delete.own`) implemented once, taking
       the row's `created_by`.
 - [ ] `?User $user = null` defaults to the current identity via `resolveUser()`.
-- [ ] Trusted-service checks fail closed and use `hash_equals()`.
+- [ ] **No shared-secret or header-based bypass.** Every caller authenticates as a
+      Joomla user and is judged on that user's permissions; a service that can be
+      satisfied by a header is not an authorisation service.
 - [ ] Service injects no DataModel/DatabaseInterface — it performs no data access.
 - [ ] Action strings and per-item asset names (`com_example.item.{id}`) match `access.xml`
       and the ACL matrix (`architecture-{ext}-acl-matrix`).

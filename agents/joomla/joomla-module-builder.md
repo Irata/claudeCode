@@ -183,6 +183,12 @@ $params = $displayData['params'];
 </div>
 ```
 
+**Dates in module templates**: never echo a raw date column. Use
+`HTMLHelper::_('date', $value, Text::_('DATE_FORMAT_LC4'))` for `DATE` columns and
+`DATE_FORMAT_LC6` for `DATETIME`, always behind a `$value > 0 ? … : '-'` guard — an empty
+value otherwise renders as today's date. Requires `use Joomla\CMS\HTML\HTMLHelper;` alongside
+the `Text` import. See "Date Display — Use Joomla's Format Strings" in the coding preferences.
+
 ## Module Types
 
 ### Site Module (`client="site"`)

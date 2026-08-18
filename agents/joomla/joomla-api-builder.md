@@ -174,6 +174,7 @@ All business logic, validation, query building, and data access remain in the Ad
 - Define which fields to expose (`fieldsToRenderItem`, `fieldsToRenderList`)
 - Handle JSON:API serialization
 - Inherit data from models without modification
+- **Emit dates as raw ISO — do NOT localise them.** The `DATE_FORMAT_LC4`/`LC6` display convention in the coding preferences applies to HTML templates only. Localising an API or CSV payload breaks consumer parsing and string sorting, and makes the response vary by the authenticated user's profile.
 
 ### Inheritance Pattern Example
 

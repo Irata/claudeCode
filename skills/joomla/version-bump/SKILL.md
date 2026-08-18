@@ -1,6 +1,6 @@
 ---
 name: version-bump
-description: Bump the V.R.M version across manifest XML, Phing build file, and SQL update file for any Joomla extension project
+description: Bump the V.R.M version across the manifest XML and SQL update file for any Joomla extension project, verifying the manifest is wired to run schema updates
 disable-model-invocation: true
 argument-hint: modification|release|version|X.Y.Z
 ---
@@ -65,11 +65,34 @@ This skill works in tandem with the **SQL Update File Management** convention do
      ```
    - If a file with this name already exists and is committed, warn the user — this version has already been released
 
-6. **Update the remaining files** (must stay in sync with the SQL file):
+6. **Verify the manifest can actually run the update files.** Creating a SQL update file is pointless if Joomla never reads the directory. Check the manifest for an `<update><schemas>` block:
+
+   ```xml
+   <update>
+       <schemas>
+           <schemapath type="mysql">sql/updates/mysql</schemapath>
+       </schemas>
+   </update>
+   ```
+
+   - **If present** — confirm the `schemapath` matches the actual SQL updates directory, then continue.
+   - **If missing** — add it (conventionally after `<install>`), and then work through the replay check below. Do **not** treat this as a silent fix; it changes update behaviour for every existing installation.
+
+   **The replay check — mandatory whenever the block was missing.** `InstallerAdapter::parseQueries()` gates both schema paths on this element existing, so if it was never there, `setSchemaVersion()` never ran on install and `#__schemas` has no row for the extension. `parseSchemaUpdates()` treats a missing row as version `'0.0.0'` and **replays every update file in the directory**, oldest first. A statement that errors makes it return `false`, which makes `parseQueries()` throw `RuntimeException` — the entire update aborts and rolls back.
+
+   So after adding the block, read **every** existing update file and classify each statement:
+
+   - `ADD COLUMN`, `ADD INDEX`, `ADD CONSTRAINT`, `DROP COLUMN` — will fail on replay. Append `/** CAN FAIL **/` immediately before the terminating semicolon (no space between `**/` and `;`).
+   - `MODIFY`, `CHANGE`, `DROP TABLE IF EXISTS`, `ENGINE=`/`COLLATE` conversions — idempotent, leave alone.
+   - Empty or comment-only files — harmless, leave alone.
+
+   Report every file guarded, and state plainly that the guards were added because the whole back-catalogue is about to re-run.
+
+7. **Update the remaining files** (must stay in sync with the SQL file):
    - **Manifest XML** — update the `<version>` tag to the new version
    - **Manifest XML** — update the `<creationDate>` to today's date in `YYYY-MM-DD` format (e.g. `<creationDate>2026-04-08</creationDate>`)
 
-7. **Check the Phing build file** — do **not** edit a version number into it.
+8. **Check the Phing build file** — do **not** edit a version number into it.
 
    The manifest XML is the single source of truth. Current Phing build files read the version at build time:
 
@@ -93,10 +116,12 @@ This skill works in tandem with the **SQL Update File Management** convention do
 
    Plugin build files use the plugin manifest path instead: `${sourcedir}/${ext_name}/${ext_name}.xml`.
 
-8. **Report** the result:
+9. **Report** the result:
    - Old version → New version
    - List all files created, renamed, or modified
+   - State whether the manifest already had `<update><schemas>`, or whether it was added — and if added, list every update file that received a `/** CAN FAIL **/` guard and why
    - State whether the Phing build file already read the version from the manifest, or was converted
    - If the SQL file was renamed, show the old and new filenames
    - If the SQL file contains schema changes, remind the user to review it
    - If the SQL file is just the placeholder marker, remind the user to add any required ALTER TABLE statements if database changes are included in this release
+   - If this release's SQL file contains schema changes, remind the user that **update files never run on a fresh install** (the installer pins `#__schemas` straight to the newest filename), so the same changes must also be reflected in `sql/install.mysql.utf8.sql` — matching column order, index names, engine, and collation

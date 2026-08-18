@@ -184,6 +184,85 @@ class ItemIntegrationTest extends DatabaseTestCase
 - Database CRUD operations
 - Event dispatching and handling
 - ACL permission checks
+- Generated columns, `UNIQUE`/`CHECK` constraints, and collation-dependent comparisons — see Cross-Layer Consistency Tests below
+
+### Cross-Layer Consistency Tests
+
+**Write these whenever one rule is expressed in more than one place.** The usual case is a
+database constraint that PHP also has to reason about: a generated column or `CHECK`
+defined in `sql/install.*.sql`, repeated in a `sql/updates/` file, and mirrored by a PHP
+method that predicts the same outcome. Comments cross-referencing each other do not stop
+divergence — only a test does. Nothing else in the suite fails when these drift apart,
+because each layer is individually correct.
+
+Assert two things:
+
+1. **The definitions are textually identical.** Extract the expression from the install
+   script and from the update file, normalise whitespace, compare. This catches the common
+   failure where one copy is edited and the other is forgotten.
+2. **The layers agree behaviourally.** Textual equality does not prove PHP predicts what
+   the database does — the two can diverge through collation alone. Drive real rows
+   through both and assert they classify identically.
+
+Cover the edge cases that actually cause silent disagreement:
+
+| Case | Why it bites |
+|---|---|
+| `NULL` vs `''` | A `UNIQUE` index treats NULLs as **distinct**, so NULL-heavy rows escape the constraint entirely. `COALESCE` in a hash removes the hole — PHP must apply the same coalescing. |
+| Leading/trailing whitespace | Only caught if both sides `TRIM`. |
+| Case variation | `SHA2()` hashes raw bytes and is case-**sensitive**; a `utf8mb4_*_ci` column compares case-**insensitively**. So dropping `LOWER()` does *not* make a PHP comparison case-sensitive — the collation still wins. Force `COLLATE utf8mb4_bin` on any column where case is meaningful. |
+| Fields where case is semantic | e.g. a PHP date-format column: `Y` is a four-digit year, `y` two-digit. Lowercasing it merges genuinely different values. |
+
+```php
+#[Test]
+public function installAndUpdateDefineTheSameExpression(): void
+{
+    $normalise = static fn (string $s) => preg_replace('/\s+/', ' ', $s);
+
+    $install = file_get_contents(self::EXT . '/sql/install.mysql.utf8.sql');
+    $update  = file_get_contents(self::EXT . '/sql/updates/mysql/2.5.1.sql');
+
+    preg_match('/SHA2\(CONCAT_WS.*?, 256\)/s', $install, $a);
+    preg_match('/SHA2\(CONCAT_WS.*?, 256\)/s', $update,  $b);
+
+    self::assertSame($normalise($a[0]), $normalise($b[0]),
+        'row_hash expression has drifted between the install script and the update file');
+}
+
+#[Test]
+#[DataProvider('equivalencePairs')]
+public function phpAgreesWithTheDatabase(array $stored, array $candidate, bool $expectDuplicate): void
+{
+    $this->insertRow($stored);
+
+    // What PHP predicts
+    self::assertSame($expectDuplicate, $this->service->isDuplicate($candidate));
+
+    // What the constraint actually does
+    $rejected = false;
+    try { $this->insertRow($candidate); } catch (\RuntimeException) { $rejected = true; }
+
+    self::assertSame($expectDuplicate, $rejected,
+        'PHP and the unique constraint disagree about what counts as a duplicate');
+}
+
+public static function equivalencePairs(): array
+{
+    return [
+        'identical row'          => [['original' => 'a'], ['original' => 'a'], true],
+        'NULL vs empty string'   => [['original' => 'a', 'copy' => null], ['original' => 'a', 'copy' => ''], true],
+        'surrounding whitespace' => [['original' => 'a'], ['original' => '  a  '], true],
+        'case variation'         => [['original' => 'a'], ['original' => 'A'], true],
+        'case-semantic field'    => [['original' => 'a', 'date_convert' => 'Y-m-d'],
+                                     ['original' => 'a', 'date_convert' => 'y-m-d'], false],
+        'differs in one field'   => [['original' => 'a', 'merge' => 'x'],
+                                     ['original' => 'a', 'merge' => 'y'], false],
+    ];
+}
+```
+
+Run these as **integration** tests against a real database — the behaviour under test is the
+engine's collation and index semantics, which a mock cannot reproduce.
 
 ### Manual Test Procedures
 For each feature, document:

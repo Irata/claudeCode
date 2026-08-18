@@ -363,6 +363,12 @@ When designing architecture, verify these DRY principles:
 **Models**
 - [ ] Administrator layer has one ItemModel with complete getItem() logic
 - [ ] Administrator layer has one ItemListModel with complete getItems() logic
+- [ ] Every ItemListModel `getListQuery()` is specified as `LocalTraits` helper calls, one per
+      concern (`setListOrdering()` → `setPublishedState()` → `setFilterColumn()` per filter-bar
+      column → `setFilterSearch()` last) — not as inline query-building logic
+- [ ] Any filter the existing helpers cannot express is specified as a **new named helper on
+      `LocalTraits`**, listed in the design alongside the models that call it
+- [ ] Every filter named in the design has a matching `getStoreId()` line
 - [ ] Site ItemModel extends Admin ItemModel (doesn't duplicate getItem/getItems)
 - [ ] API model extends Admin model (almost no override)
 - [ ] CLI commands inject Admin models, don't create custom models

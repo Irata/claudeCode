@@ -625,6 +625,14 @@ class TrolleyController extends AdminController {
 
 ### 4. Models
 - **List models**: Extend `ListModel` — implement `getListQuery()` with prepared statements and `ParameterType` binding, `populateState()` for filters/sorting
+- **List query building is NOT freehand.** `getListQuery()` MUST follow the preferred pattern in
+  `includes/joomla-coding-preferences.md` → *Preferred `getListQuery()` Pattern — Delegate to
+  `LocalTraits` Helpers*: select columns, `setFrom()`, then one call per concern —
+  `setListOrdering()` → `setPublishedState()` → one `setFilterColumn()` per filter-bar column →
+  `setFilterSearch()` last. No inline `if`/`where()`/`bind()` blocks in the model. A filter that no
+  existing helper covers gets a **new named helper added to `LocalTraits`**, not inline logic.
+  Mirror every applied filter in `getStoreId()`. Reference implementation: `com_mapper`'s `MapsModel`.
+- Every list model that builds a query MUST `use LocalTraits;` and declare `protected string $_tbl`
 - **Form models**: Extend `AdminModel` — implement `getForm()`, `getItem()`, `save()`, validation rules
 - **NEVER** use string concatenation in queries — always use `$db->quoteName()` and bound parameters
 - Use `$db->getQuery(true)` for query building
@@ -825,6 +833,7 @@ Place this immediately before the title link in the title `<td>`.
 - Include filter and validation attributes
 - Define filter fields for list views in `filter_*.xml`
 - **Do NOT include a `fullordering` field** in `<fields name="list">` — column headings already provide sorting via `HTMLHelper::_('searchtools.sort', ...)`. Only include the `limit` (limitbox) field in the `list` fieldset.
+- **`calendar` fields MUST carry `translateformat="true"`**, plus `showtime="true"` and `filter="user_utc"` for `DATETIME` columns. Without it the field ignores the site language and uses a hardcoded format. See "Date Display — Use Joomla's Format Strings" in the coding preferences.
 
 ### 8. Templates (`tmpl/`)
 - List view: Use `Joomla\CMS\Layout\LayoutHelper` for standard list layouts
@@ -833,6 +842,7 @@ Place this immediately before the title link in the title `<td>`.
 - Use Web Asset Manager for CSS/JS loading
 - **List column header language strings**: Use `COM_{NAME}_COLUMN_{FIELD}` for custom columns (e.g. `COM_EXAMPLE_COLUMN_PRICE`). NEVER use `_HEADING_`. Joomla core strings (`JGRID_HEADING_ID`, `JSTATUS`, `JGLOBAL_TITLE`, etc.) are used directly — only entity-specific columns need the `_COLUMN_` convention.
 - **Bootstrap modals**: Always load via `HTMLHelper::_('bootstrap.modal', '#modalId')` before the modal markup. This registers the modal with Joomla's Web Asset Manager and loads the Bootstrap modal ES module. Use Bootstrap's data-API (`data-bs-toggle`, `data-bs-target`, `data-bs-dismiss`) for open/close — never construct `new bootstrap.Modal()` in JavaScript.
+- **Dates**: never echo a raw date column. Use `HTMLHelper::_('date', $value, Text::_('DATE_FORMAT_LC4'))` for `DATE` columns and `DATE_FORMAT_LC6` for `DATETIME`, always behind a `$value > 0 ? … : '-'` guard — an empty value otherwise renders as today's date. See "Date Display — Use Joomla's Format Strings" in the coding preferences.
 
 ### 9. ACL (`access.xml`, `config.xml`)
 - Define component-level actions per architect's ACL matrix

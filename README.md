@@ -84,7 +84,7 @@ This means every agent and conversation in the project automatically has access 
 
 | File | Purpose |
 |------|---------|
-| **joomla-coding-preferences.md** | Coding standards — namespacing, PHP 8.3+ conventions, design patterns, configuration rules, and database schema conventions |
+| **joomla-coding-preferences.md** | Coding standards — namespacing, PHP 8.3+ conventions, design patterns, the preferred `getListQuery()` / `LocalTraits` list-query pattern, configuration rules, and database schema conventions |
 | **joomla-devel-environment.md** | Development environment setup — directory paths, source mapping, and local server configuration |
 | **joomla-structure-component.md** | Reference directory and file structure for Joomla components (administrator and site) |
 | **joomla-structure-module.md** | Reference directory and file structure for Joomla modules |

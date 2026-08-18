@@ -22,7 +22,9 @@
 ✅ Publicationstate (enum)      ❌ PublicationState
 ```
 
-**Recognised type suffixes** (retain PascalCase): `Controller`, `Model`, `DataModel`, `View` / `HtmlView`, `Table`, `Service`, `Field`, `Helper`, `Dispatcher`. Everything before the suffix is the entity segment and must be one word. Classes with **no** recognised suffix (Enums, value objects such as `ImportResult`) are treated as all-entity and must also be a single word.
+**Recognised type suffixes** (retain PascalCase): `Controller`, `Model`, `DataModel`, `View` / `HtmlView`, `Table`, `Service`, `Field`, `Helper`, `Dispatcher`, `Component`. Everything before the suffix is the entity segment and must be one word. Classes with **no** recognised suffix (Enums, value objects such as `Importresult`) are treated as all-entity and must also be a single word.
+
+`Component` covers the extension entry-point class in `src/Extension/`. The entity segment still collapses to one word, so a two-word entity gives `SpacepartnerComponent`, not `Spacepartnercomponent`. The class is instantiated by explicit FQCN from `services/provider.php`, placing it in the convention-only tier, and every Joomla extension names it `<Entity>Component` alongside core's own `MVCComponent`.
 
 **Why this exists.** Joomla resolves MVC and form-field names from request/config strings via effectively `ucfirst(strtolower($name))` — it capitalises **only the first letter** and never restores internal capitals. So `&view=userprofile` resolves to class `Userprofile…`; a class named `UserProfile…` is never produced by the resolver. Because `createModel()` / `createTable()` / `getModel()` already lowercase-then-`ucfirst` the name they are handed, the names passed to them are kept all-lowercase — which is exactly why the target class can only ever be a single capitalised word.
 
@@ -32,7 +34,7 @@
 
 **Risk tiers.**
 - **Breaks at runtime on Linux** — classes resolved *by name*: `Controller`, `Model`, `View` folder, `Table`, form `Field`. Multi-word names here are functional bugs.
-- **Convention-only (works today, still non-compliant)** — classes resolved *by explicit FQCN* via DI / `provider.php`: `Service`, `DataModel`, `Enum`, value objects, `Helper`. These must still be single-word for consistency.
+- **Convention-only (works today, still non-compliant)** — classes resolved *by explicit FQCN* via DI / `provider.php`: `Service`, `DataModel`, `Enum`, value objects, `Helper`, `Component`. These must still be single-word for consistency.
 
 **Multi-word entities** collapse to one lowercase-after-first token: `UserProfile → Userprofile`, `SpacePartner → Spacepartner`, `AuditLog → Auditlog`, `IncidentType → Incidenttype`, `ExportPartners → Exportpartners`. Only folders that contain **classes** (`Controller/`, `Model/`, `Table/`, `View/<Entity>/`, `Service/`, `Field/`, `Enum/`, `Helper/`) follow this case convention — non-class folders (`tmpl/`, `forms/`, `language/`, `media/`) are already all-lowercase and are correct as-is.
 
@@ -214,10 +216,23 @@ These are exceptions, not a general license — ordinary per-record writes still
   - Incrementing **V** (version) resets both **R** and **M** to `0` (e.g. `1.2.3` → `2.0.0`)
   - Incrementing **R** (release) resets **M** to `0` (e.g. `1.2.3` → `1.3.0`)
   - Incrementing **M** (modification) changes only **M** (e.g. `1.2.3` → `1.2.4`)
-- **Three files MUST stay in sync**:
+- **Two files MUST stay in sync**:
   1. **SQL update file**: `sql/updates/mysql/{V.R.M}.sql`
   2. **Manifest XML**: `<version>` element in `admin/com_{name}/{name}.xml`
-  3. **Phing build file**: `version` property in `Phing/com_{name}.xml`
+- **The manifest is the single source of truth for the version.** The Phing build file MUST read it at build time rather than carrying a hardcoded literal:
+  ```xml
+  <xmlproperty file="${sourcedir}/admin/${ext_prefix}${ext_name}/${ext_name}.xml" prefix="mf" keepRoot="true" />
+  <property name="version" value="${mf.extension.version}" override="true" />
+  ```
+  Add a fail-fast guard at the top of the `build` target — Phing leaves an unresolved property as its literal token and would otherwise emit `com_example..zip`:
+  ```xml
+  <fail message="Could not read &lt;version&gt; from ${ext_name}.xml - check the manifest path.">
+      <condition>
+          <contains string="${version}" substring="mf.extension" />
+      </condition>
+  </fail>
+  ```
+  A build file still holding `<property name="version" value="X.Y.Z" .../>` is legacy — convert it to the pattern above instead of updating the literal.
 - **When bumping the version**, also review the `<creationDate>` element in the manifest XML and update it to the current date (e.g. `<creationDate>yyyy-mm-dd</creationDate>`) if it does not reflect the current date
 
 ### PHPDoc `@since` Tags — Track the Manifest Version
@@ -272,6 +287,63 @@ Existing committed files: 2.4.0.sql, 2.4.1.sql, 2.4.2.sql
    - If changes are a bugfix → /version-bump modification → 2.4.3.sql stays as-is, manifest + Phing set to 2.4.3
    - If changes are a feature → /version-bump release → 2.4.3.sql renamed to 2.5.0.sql, manifest + Phing set to 2.5.0
 ```
+
+#### Manifest Wiring — `<update><schemas>` Is Mandatory
+
+Writing update files is not enough. Joomla only looks at `sql/updates/{driver}/` if the manifest declares a schema path:
+
+```xml
+<update>
+    <schemas>
+        <schemapath type="mysql">sql/updates/mysql</schemapath>
+    </schemas>
+</update>
+```
+
+`InstallerAdapter::parseQueries()` gates **both** halves of the lifecycle on this element existing:
+
+| Route | Method called | Effect |
+|---|---|---|
+| `install` / `discover_install` | `Installer::setSchemaVersion()` | Records the **highest** update filename in `#__schemas` as the baseline |
+| `update` | `Installer::parseSchemaUpdates()` | Runs every file with a version greater than the recorded baseline |
+
+**The trap**: if an extension shipped without this block, no `#__schemas` row was ever written. `parseSchemaUpdates()` treats a missing row as version `'0.0.0'` and therefore **replays every update file from the beginning**. Adding the block to a mature extension triggers this on the next update.
+
+This is not a soft failure. A failing statement makes `parseSchemaUpdates()` return `false`, which makes `parseQueries()` throw `RuntimeException` — **the entire update aborts and rolls back**.
+
+#### Making Update SQL Replay-Safe — `/** CAN FAIL **/`
+
+Plain `ADD COLUMN` / `ADD INDEX` / `DROP COLUMN` statements error when replayed against a database that already has the change. Mark any statement that is safe to skip with Joomla's marker (`Installer::CAN_FAIL_MARKER`, available since Joomla 4.2):
+
+```sql
+-- Replay-safe: installer strips the marker and swallows this statement's error
+ALTER TABLE `#__example` ADD COLUMN `notes` text NULL /** CAN FAIL **/;
+ALTER TABLE `#__example` ADD INDEX idx_state (`state`) /** CAN FAIL **/;
+```
+
+- The marker goes **immediately before the terminating semicolon**, with no space between `**/` and `;` — the installer matches on the last 17 characters of the statement.
+- It suppresses only that one statement; the rest of the file still runs.
+- `MODIFY` / `CHANGE` and `DROP TABLE IF EXISTS` are already idempotent and do not need it.
+- Empty `.sql` files are harmless — only a `file_get_contents()` of `false` aborts, and an empty buffer simply yields no queries. They are valid as version markers.
+
+#### The Install Script Must Be Schema-Complete
+
+Because a fresh install pins `#__schemas` straight to the newest update filename, **update files never run on a fresh install**. The install script is therefore the complete current schema, not the original schema.
+
+> **Every schema change written to an update file MUST also be applied to `sql/install.mysql.utf8.sql`.**
+
+Keep the two in agreement on column order (mirror the `AFTER` clauses), index names, engine, and collation. Drift here means fresh and upgraded installs silently diverge — a class of bug that surfaces only on a customer's new site.
+
+#### Install and Uninstall Must Not Destroy Data
+
+Data tables are removed **manually by the administrator**, never automatically:
+
+- **No `DROP TABLE` at the top of the install script.** Rely on `CREATE TABLE IF NOT EXISTS` alone so install and reinstall are non-destructive.
+- **No `<uninstall>` SQL block** for data tables in the manifest — uninstalling leaves the table in place.
+
+Both halves are required. A `DROP TABLE` in the install script silently defeats the uninstall policy, because reinstalling would wipe the table anyway. Leave a comment in the SQL recording that the omission is deliberate, so it is not "fixed" later.
+
+Also audit `sql/uninstall.*.sql` for copy-paste leftovers naming another extension's tables — an unreferenced file is inert, but becomes destructive the moment someone wires it up.
 
 ### Git Commit Message Convention — Conventional Commits
 - All projects MUST use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) syntax
@@ -343,6 +415,106 @@ Existing committed files: 2.4.0.sql, 2.4.1.sql, 2.4.2.sql
       <option value="">FILTER_SCOPE</option>
   </field>
   ```
+
+### Preferred `getListQuery()` Pattern — Delegate to `LocalTraits` Helpers
+
+**This is the required shape for every `ListModel::getListQuery()`.** Ordering, published state,
+search and each filter-bar column are handled by a single-purpose helper on the component's
+`LocalTraits` trait. The query method stays a flat, readable declaration of *what* the list needs —
+never *how* each clause is built. No `if` blocks, no inline `bind()` calls, no repeated
+`where()`/`quoteName()` boilerplate in the model.
+
+Canonical example: `com_mapper` — `administrator/components/com_mapper/src/Model/MapsModel.php`.
+
+```php
+class MapsModel extends ListModel
+{
+    use LocalTraits;
+
+    protected string $_tbl = '#__mapper_maps';
+
+    public function __construct($config = [])
+    {
+        $this->app = $this->app ?: Factory::getApplication();
+        $this->db  = $this->db  ?: Factory::getContainer()->get('DatabaseDriver');
+
+        parent::__construct($config);
+
+        // Columns the search box searches across
+        $this->haystack = $config['haystack'] ?? null;
+    }
+
+    protected function getStoreId($id = '')
+    {
+        // One line per filter — MUST mirror the filters applied in getListQuery()
+        $id .= ':' . $this->getState('filter.search');
+        $id .= ':' . $this->getState('filter.published');
+        $id .= ':' . $this->getState('filter.scope');
+        $id .= ':' . $this->getState('filter.affiliation');
+
+        return parent::getStoreId($id);
+    }
+
+    protected function getListQuery()
+    {
+        $items = $this;
+        $items->getQuery();
+
+        // Select the required fields from the table.
+        $items->query->select([
+            $this->db->quoteName('id'),
+            $this->db->quoteName('original'),
+            $this->db->quoteName('scope'),
+            $this->db->quoteName('affiliation'),
+            $this->db->quoteName('state'),
+        ]);
+        $items->setFrom($items->query, alias: 'm');
+
+        $this->setListOrdering($items);
+        $this->setPublishedState($items);
+
+        // Column filters from the filter bar
+        $this->setFilterColumn($items, 'scope');
+        $this->setFilterColumn($items, 'affiliation');
+
+        // ALWAYS last — see the setFilterSearch() rule below
+        $this->setFilterSearch($items, $this->haystack);
+
+        return $items->query;
+    }
+}
+```
+
+**`LocalTraits` query-building contract** — every component's `LocalTraits` provides these:
+
+| Method | Responsibility |
+|--------|----------------|
+| `getQuery(?object &$query = null, bool $value = true)` | Creates the query object into `$this->query` (or into the passed reference) |
+| `setFrom(?object &$query, ?string $table, ?string $alias)` | `FROM` clause from `$this->_tbl` (or an override) with optional alias |
+| `setListOrdering(?object $model, ?array $options, array $default)` | `ORDER BY` from `list.ordering` / `list.direction` state, with a default |
+| `setPublishedState(?object $model, ?array $options)` | `WHERE state = :state` from `filter.published`; skipped for `*` or non-numeric |
+| `setFilterColumn(object $model, string $column)` | `WHERE {column} = :{column}` from `filter.{column}`; skipped when null/empty |
+| `setFilterSearch(?object $model, ?array $haystack)` | `id:N` lookup, otherwise `LIKE` across every haystack column, OR-grouped |
+| `sqlDump($query)` | Resolved SQL for debugging — see below |
+
+**Rules**
+
+- **One filter, one call.** Each filter-bar column is exactly one `setFilterColumn()` line. Never
+  hand-roll a `where()`/`bind()` pair in the model for something a helper already covers.
+- **New filter shape → new helper.** When a filter cannot be expressed by an existing helper
+  (date range, `IN` list, JOINed column, `NULL` check), add a named helper to `LocalTraits`
+  (`setFilterDateRange()`, `setFilterInList()`, …) and call it from `getListQuery()`. Do **not**
+  inline the logic — the helper is where the binding gotchas get solved once.
+- **Call order is fixed**: `setListOrdering()` → `setPublishedState()` → column filters →
+  `setFilterSearch()` last. See the next section for why search must be last.
+- **`getStoreId()` mirrors the filters.** Every filter applied in `getListQuery()` gets a line in
+  `getStoreId()`, or cached results leak between filter states.
+- **`filter_fields`** in the constructor config must list every sortable column, or
+  `list.ordering` is silently rejected by `ListModel::populateState()`.
+- **No leftover debug.** Never commit `$x = $items->query->dump();` — use `sqlDump()` while
+  debugging and remove it before commit.
+- Site/API/CLI list models **extend the Administrator list model** and override only the extra
+  filter — they never repeat this scaffolding. See the DRY layering rules in the builder agents.
 
 ### `setFilterSearch()` Must Be Called Last in Query Building
 - The `setFilterSearch()` method in `LocalTraits` uses `where($conditions, 'OR')` when no prior WHERE clause exists
@@ -549,6 +721,63 @@ KEY `idx_lft` (`lft`)
 - `LayoutHelper::render` requires `use Joomla\CMS\Layout\LayoutHelper;` in the template — omitting it fails with `Class "LayoutHelper" not found`.
 - Column-header sort links remain `HTMLHelper::_('searchtools.sort', $titleKey, $orderColumn, $listDirn, $listOrder)` — that method does exist.
 - The view must expose `filterForm`, `activeFilters`, and `state` (set from the model in `display()`); the layout reads them.
+
+### Date Display — Use Joomla's Format Strings
+
+Never echo a raw date column into a template. A database value is ISO (`2026-06-24`); what the
+user should see is their site language's and profile's format. Route every displayed date through
+`HTMLHelper` with a language-defined format string.
+
+| Column type | Format string | Use for |
+|---|---|---|
+| SQL `DATE` | `DATE_FORMAT_LC4` | Calendar days — invoice dates, due dates, raised dates |
+| SQL `DATETIME` | `DATE_FORMAT_LC6` | Instants — `created`, `modified`, `checked_out_time` |
+
+```php
+<td><?php echo $item->date_raised > 0
+    ? HTMLHelper::_('date', $item->date_raised, Text::_('DATE_FORMAT_LC4'))
+    : '-'; ?></td>
+```
+
+- **The empty guard is mandatory, not defensive style.** `HTMLHelper::_('date', ...)` defaults its
+  input to `'now'`, so a NULL or empty column renders as **today's date** — a wrong value that
+  looks entirely plausible and will not be spotted in review. `> 0` covers `null`, `''` and `0`.
+  Fall back to `'-'`, matching `com_content`'s article list.
+- Requires `use Joomla\CMS\HTML\HTMLHelper;` and `use Joomla\CMS\Language\Text;` in the template.
+- Do **not** wrap the result in `$this->escape()`. Core does not: the output is a formatted date
+  assembled from a language string, not user input.
+- **API, CSV and export output is exempt.** Machine-readable payloads keep the raw ISO value.
+  Localising them breaks consumer parsing and string sorting.
+
+#### Record Forms — `translateformat="true"` on Calendar Fields
+
+A `calendar` field in a record form has its own format, independent of the display helpers above.
+Without `translateformat` it falls back to a hardcoded format and ignores the site language
+entirely. With it, `CalendarField` resolves the format from language strings, choosing which pair
+by `showtime`:
+
+| `showtime` | Resolves to |
+|---|---|
+| `"true"` | `DATE_FORMAT_CALENDAR_DATETIME` + `DATE_FORMAT_FILTER_DATETIME` |
+| absent / `"false"` | `DATE_FORMAT_CALENDAR_DATE` + `DATE_FORMAT_FILTER_DATE` |
+
+```xml
+<field
+    name="created"
+    type="calendar"
+    label="COM_EXAMPLE_FIELD_CREATED_LABEL"
+    translateformat="true"
+    showtime="true"
+    filter="user_utc"
+/>
+```
+
+- `filter="user_utc"` converts the submitted value from the user's timezone to UTC for storage.
+  Include it on `DATETIME` columns; omit it on `DATE` columns, which carry no time to convert.
+- Omit `showtime` for date-only columns, or the field offers a time picker for a column that
+  cannot store one.
+- Note these are `DATE_FORMAT_CALENDAR_*` strings, **not** LC4/LC6. LC4/LC6 are for display via
+  `HTMLHelper`; the calendar field has its own set. Do not mix them up.
 
 ### Model Error Surfacing
 - All ListModel and AdminModel subclasses MUST use the `DebugErrorAwareTrait`

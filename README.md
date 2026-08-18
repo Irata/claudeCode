@@ -88,9 +88,9 @@ This means every agent and conversation in the project automatically has access 
 | **joomla-devel-environment.md** | Development environment setup — directory paths, source mapping, and local server configuration |
 | **joomla-structure-component.md** | Reference directory and file structure for Joomla components (administrator and site) |
 | **joomla-structure-module.md** | Reference directory and file structure for Joomla modules |
-| **joomla-structure-plugin.md** | Reference directory and file structure for Joomla plugins |
+| **joomla-structure-plugin.md** | Reference directory and file structure for Joomla plugins, plus the rule that registration plugins publish what they register in their own options screen |
 | **joomla-structure-api.md** | Reference directory and file structure for Joomla REST API extensions |
-| **joomla-structure-cli.md** | Reference directory and file structure for Joomla CLI commands |
+| **joomla-structure-cli.md** | Reference directory and file structure for Joomla CLI commands, plus the self-documenting console plugin pattern (command reference read from each command's InputDefinition) |
 | **joomla-di-patterns.md** | Dependency injection patterns — service providers, container registration, and factory patterns |
 | **joomla-events-system.md** | Joomla event system — dispatching, subscribing, and event class conventions |
 | **joomla-depreciated.md** | Deprecated Joomla patterns to avoid — legacy APIs, removed features, and migration paths |

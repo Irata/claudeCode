@@ -471,7 +471,16 @@ Register commands in the component's `boot()` method or service provider.
 #### Via Console Plugin
 For standalone commands not tied to a specific component, use a console plugin with `SubscriberInterface` listening to `ApplicationEvents::BEFORE_EXECUTE`.
 
-Reference: `includes/joomla-structure-cli.md` for full registration patterns.
+The listener registers from a single `CommandRegistry::commands()` list rather than an inline list
+of its own, and the plugin **must** document those commands in its own options screen via a
+read-only `CommandsField` that reads each command's `InputDefinition`. Required for every console
+plugin created or revised. When the plugin itself is being built, that work belongs to
+`joomla-plugin-builder`; keep your commands' `setDescription()`, `setHelp()`, and every
+`addArgument()`/`addOption()` description populated, because that text is what the options screen
+renders.
+
+Reference: `includes/joomla-structure-cli.md` for full registration patterns and the
+"Self-Documenting Console Plugin" reference.
 
 ### Output Standards
 - Use `SymfonyStyle` for all output formatting

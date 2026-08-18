@@ -166,6 +166,48 @@ For Joomla Task Scheduler integration — scheduled/automated tasks.
 ### Console Plugins (`group="console"`)
 For CLI command registration. Listen to `ApplicationEvents::BEFORE_EXECUTE`.
 
+#### Command Reference in the Plugin Options — REQUIRED
+
+Every console plugin you create **or revise** must publish its registered commands in its own
+options screen. Commands registered only inside `registerCommands()` are invisible to an
+administrator without shell access, and `php cli/joomla.php list` still will not say what a
+command's arguments mean. The plugin holds no settings, so the options tab is free space.
+
+Unlike the webservices equivalent, **nothing here is transcribed by hand**: a command is an object
+that already knows its own name, description, arguments and options, so read them off it and drift
+becomes impossible.
+
+Deliverables (full code samples in `includes/joomla-structure-cli.md`, "Self-Documenting Console
+Plugin"):
+
+1. `src/Console/CommandRegistry.php` — the single list of commands, consumed by both the
+   `BEFORE_EXECUTE` listener and the field, so the options screen cannot describe a command the
+   plugin does not actually register.
+2. `src/Field/CommandsField.php` — a `FormField` that stores nothing and renders each command's
+   name, description, synopsis, arguments and options read off its own `InputDefinition`. Wrap the
+   registry call in `try`/`catch (\Throwable)`: a console plugin can outlive its component, and an
+   options screen that fatals is worse than one that admits it cannot list the commands.
+3. A `<config><fields name="params">` block whose `<fieldset>` carries
+   `addfieldprefix="Vendor\Plugin\Console\Example\Field"`.
+4. Language strings for every piece of prose — none in the PHP. The `.sys.ini` description is
+   static and cannot enumerate arguments, so give it a one-line summary naming the commands.
+
+Three failure modes to check for, none of which a lint or an install will surface:
+
+- **A custom field type that does not resolve silently becomes a text input.** Wrong or missing
+  `addfieldprefix` renders a stray text box instead of erroring. Render the field once and assert
+  the resolved class is yours, not `Joomla\CMS\Form\Field\TextField`.
+- **Never call `getProcessedHelp()`.** It builds `%command.full_name%` from `$_SERVER['PHP_SELF']`,
+  which on an administrator web request yields `/administrator/index.php example:import` — a
+  copy-pasteable instruction that cannot work. Use `getHelp()` and substitute the placeholders
+  against the real console path yourself.
+- **The address is a filesystem path, not a URL.** Use `JPATH_ROOT` + `/cli/joomla.php`;
+  `Uri::root()` belongs to the webservices field only, and yields `https://joomla.invalid/…` in a
+  real console context.
+
+Adding a command means adding it to `CommandRegistry::commands()` — nothing else should carry a
+second list.
+
 ### Webservices Plugins (`group="webservices"`)
 For API route registration. Listen to `onBeforeApiRoute`.
 

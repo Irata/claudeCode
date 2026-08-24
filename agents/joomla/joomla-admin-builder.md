@@ -704,8 +704,14 @@ class HtmlView extends BaseHtmlView
             $childBar->trash('{entities}.trash')->listCheck(true);
         }
 
-        if ($canDo->get('core.delete')) {
-            $toolbar->delete('{entities}.delete')
+        // Purge is offered ONLY where trashed records are visible. canDelete() refuses any
+        // record not already at state -2, and does so BEFORE the ACL check, so a Delete
+        // button in the default view can never succeed — it returns the misleading
+        // "Delete not permitted". This condition assumes the list hides trashed records
+        // unless the Status filter asks for them; a list showing every state by default
+        // needs the other variant. Read includes/joomla-trash-delete-pattern.md first.
+        if ((string) $this->state->get('filter.published') === '-2' && $canDo->get('core.delete')) {
+            $toolbar->delete('{entities}.delete', 'JTOOLBAR_EMPTY_TRASH')
                 ->message('JGLOBAL_CONFIRM_DELETE')
                 ->listCheck(true);
         }
@@ -716,6 +722,13 @@ class HtmlView extends BaseHtmlView
     }
 }
 ```
+
+**Never emit a Delete button without a Trash button.** The `trash` task needs no controller
+work — `AdminController` already registers it and maps it to `-2`. A component that offers
+Delete alone is broken on delivery: nothing can reach the trashed state, so the button
+fails on every record and the failure reads as an ACL problem. Full pattern, both gating
+variants, and how to restrict Empty Trash to `core.admin`:
+`includes/joomla-trash-delete-pattern.md`.
 
 #### FormView Reference Template
 Use this as the base for ALL administrator edit/form views:

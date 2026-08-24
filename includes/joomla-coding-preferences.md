@@ -128,7 +128,7 @@ Admin views use `$toolbar = $this->getDocument()->getToolbar()` to access the to
 | Button | Method |
 |--------|--------|
 | New | `$toolbar->addNew('{entity}.add')` |
-| Delete | `$toolbar->delete('{entities}.delete')->message('JGLOBAL_CONFIRM_DELETE')->listCheck(true)` |
+| Delete / Empty Trash | `$toolbar->delete('{entities}.delete', 'JTOOLBAR_EMPTY_TRASH')->message('JGLOBAL_CONFIRM_DELETE')->listCheck(true)` |
 | Publish | `$toolbar->publish('{entities}.publish')->listCheck(true)` |
 | Unpublish | `$toolbar->unpublish('{entities}.unpublish')->listCheck(true)` |
 | Archive | `$toolbar->archive('{entities}.archive')->listCheck(true)` |
@@ -139,6 +139,20 @@ Admin views use `$toolbar = $this->getDocument()->getToolbar()` to access the to
 | Save as Copy | `$toolbar->save2copy('{entity}.save2copy')` |
 | Cancel / Close | `$toolbar->cancel('{entity}.cancel', 'JTOOLBAR_CLOSE')` |
 | Options | `$toolbar->preferences('com_{name}')` |
+
+**Delete and Trash are not peers — never offer Delete without Trash.** Joomla deletes in
+two steps: trash the record (`state = -2`), then purge it from the Trashed filter.
+`canDelete()` refuses any record that is not already trashed, and it does so **before** the
+ACL check, so no permission level — Super User included — can delete a record straight from
+the default list. A Delete button offered there can never succeed; it returns
+`JLIB_APPLICATION_ERROR_DELETE_NOT_PERMITTED` ("Delete not permitted"), which reads as a
+permissions failure and sends administrators auditing an ACL matrix that is fine.
+
+Offer **Trash** in the normal view and **Empty Trash** only where trashed records are
+visible. Adding the trash button is the whole change — `AdminController` already registers
+the `trash` task and maps it to `-2`. Full pattern, including the two gating variants and
+how to restrict Empty Trash to a higher permission:
+`includes/joomla-trash-delete-pattern.md`.
 
 ### Model → Table Relationship (Critical Rule)
 

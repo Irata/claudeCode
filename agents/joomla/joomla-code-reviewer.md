@@ -1146,6 +1146,20 @@ Flag legacy plugin event patterns and verify that modernizations preserve backwa
   - **Fix**: Get the toolbar object via `$toolbar = $this->getDocument()->getToolbar()`, then call instance methods: `$toolbar->addNew()`, `$toolbar->save()`, `$toolbar->delete()->message('...')->listCheck(true)`, etc.
 - **`Toolbar::getInstance()`**: Deprecated since Joomla 5.0. Flag any usage.
   - **Fix**: Use `$this->getDocument()->getToolbar()` in views, or `Factory::getApplication()->getDocument()->getToolbar()` elsewhere.
+- **Delete button with no Trash button**: In a list view's `addToolbar()`, flag any
+  `$toolbar->delete(...)` where the component registers no `trash` button anywhere. Joomla
+  deletes in two steps, and `canDelete()` refuses any record not already at `state = -2`
+  **before** it checks ACL — so nothing can reach the trashed state and the button fails on
+  every record, reporting "Delete not permitted". This is a functional defect, not a style
+  issue: the delete path is unreachable for every user including Super Users.
+  - **Fix**: Add `$toolbar->trash('{entities}.trash')->listCheck(true)` for the normal view
+    and show `delete()` relabelled `JTOOLBAR_EMPTY_TRASH` only where trashed records are
+    visible. No controller change is needed. See `includes/joomla-trash-delete-pattern.md`.
+- **Empty Trash gated only in the toolbar**: If a component hides its purge button behind a
+  permission (commonly `core.admin`) but `canDelete()` still defers to
+  `parent::canDelete()`, the restriction is decoration — `AdminModel::delete()` is reachable
+  by any POST naming the task, and the parent only checks `core.delete`. Flag it and require
+  the check in `canDelete()`.
 - **`getInstance()` on Joomla Framework classes**: The framework-level classes (`Joomla\Filter\InputFilter`, `Joomla\Input\Input`, etc.) do NOT have `getInstance()` static factories — only constructors. Flag any `InputFilter::getInstance(...)` or similar calls on framework classes.
   - **Fix**: Use `new InputFilter(...)` instead. Check the `use` import to determine whether the code references the framework class (`Joomla\Filter\InputFilter`) or the CMS wrapper (`Joomla\CMS\Filter\InputFilter`). Framework classes always require `new`.
 - **`$response->code` on HTTP responses**: `Joomla\Http\Response` implements PSR-7 — there is no public `$code` property. Flag any `$response->code` after `HttpFactory::getHttp()->post()` or `->get()` calls.

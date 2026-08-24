@@ -109,8 +109,12 @@ protected function addToolbar(): void
         $childBar->trash('items.trash')->listCheck(true);
     }
 
-    if ($canDo->get('core.delete')) {
-        $toolbar->delete('items.delete')
+    // Delete is offered ONLY where trashed records are visible, because canDelete()
+    // refuses anything not already at state -2 — a Delete button in the default view
+    // can never succeed and returns a misleading "Delete not permitted".
+    // See includes/joomla-trash-delete-pattern.md before copying this.
+    if ((string) $this->state->get('filter.published') === '-2' && $canDo->get('core.delete')) {
+        $toolbar->delete('items.delete', 'JTOOLBAR_EMPTY_TRASH')
             ->message('JGLOBAL_CONFIRM_DELETE')
             ->listCheck(true);
     }
@@ -120,6 +124,11 @@ protected function addToolbar(): void
     }
 }
 ```
+
+> The `filter.published` condition above assumes the list **hides** trashed records unless
+> the Status filter asks for them, as core components do. A list that shows every state by
+> default needs a different gate, or the button is never there when it is wanted —
+> `includes/joomla-trash-delete-pattern.md` covers both variants.
 
 #### Full Before/After Example — FormView `addToolbar()`
 

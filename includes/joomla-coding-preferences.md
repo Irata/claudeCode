@@ -438,63 +438,139 @@ search and each filter-bar column are handled by a single-purpose helper on the 
 never *how* each clause is built. No `if` blocks, no inline `bind()` calls, no repeated
 `where()`/`quoteName()` boilerplate in the model.
 
-Canonical example: `com_mapper` — `administrator/components/com_mapper/src/Model/MapsModel.php`.
+Canonical example: `com_inventorydata` — `administrator/components/com_inventorydata/src/View/Savedlists/HtmlView.php`
+paired with `.../src/Model/SavedlistsModel.php`. (`com_emporium` carries the same `LocalTraits`
+setters but has not yet moved the two lists out of its models; `com_mapper` still declares both in
+the model/constructor and is **not** a reference for this pattern.)
+
+**`filter_fields` and `haystack` belong to the View, not the model constructor.** Both lists
+describe the *template* — which column headings `searchtools.sort` offers, and what the search box
+matches — so they live beside it in the list view and are pushed into the model before
+`getItems()`. Do not pass them through `$config` in `__construct()`, and do not hard-code them in
+the model.
 
 ```php
-class MapsModel extends ListModel
+// View/Savedlists/HtmlView.php
+class HtmlView extends BaseHtmlView
+{
+    /**
+     * Columns the list may be ordered and filtered by.
+     *
+     * An allow list, not documentation: ListModel::populateState() refuses any list.ordering
+     * absent here and falls back to the default, and setListOrdering() puts the column into
+     * ORDER BY through escape(), which does not make an identifier safe. Every column offered
+     * by searchtools.sort in the template must appear here — otherwise that heading looks
+     * sortable and silently is not — and every entry must be a column the list query selects.
+     */
+    private array $filter_fields = [
+        'id', 'a.id',
+        'list_name', 'a.list_name',
+        'list_type', 'a.list_type',
+        'state', 'a.state',
+        'created', 'a.created',
+    ];
+
+    /** Columns the search box matches against with LIKE. */
+    private array $haystack = [
+        'a.list_name',
+        'a.owner_reference',
+    ];
+
+    public function display($tpl = null): void
+    {
+        $model = $this->getModel();
+
+        // MUST precede getItems(), which triggers populateState() and the ordering check.
+        $model->setFilterFields($this->filter_fields);
+        $model->setHaystack($this->haystack);
+
+        $this->items         = $model->getItems();
+        $this->pagination    = $model->getPagination();
+        $this->state         = $model->getState();
+        $this->filterForm    = $model->getFilterForm();
+        $this->activeFilters = $model->getActiveFilters();
+
+        $this->addToolbar();
+
+        parent::display($tpl);
+    }
+}
+```
+
+```php
+// Model/SavedlistsModel.php — no __construct(), no filter_fields, no haystack literal
+class SavedlistsModel extends ListModel
 {
     use LocalTraits;
 
-    protected string $_tbl = '#__mapper_maps';
+    /**
+     * Table this list is built from, and the alias the query uses for it. Consumed by
+     * setFrom(); the alias is what makes 'a.id' the correct qualified column to hand
+     * setFilterSearch().
+     */
+    protected string $_tbl       = '#__bricks_inventory_savedlists';
+    protected string $_tbl_alias = 'a';
 
-    public function __construct($config = [])
-    {
-        $this->app = $this->app ?: Factory::getApplication();
-        $this->db  = $this->db  ?: Factory::getContainer()->get('DatabaseDriver');
-
-        parent::__construct($config);
-
-        // Columns the search box searches across
-        $this->haystack = $config['haystack'] ?? null;
-    }
-
-    protected function getStoreId($id = '')
+    protected function getStoreId($id = ''): string
     {
         // One line per filter — MUST mirror the filters applied in getListQuery()
         $id .= ':' . $this->getState('filter.search');
         $id .= ':' . $this->getState('filter.published');
-        $id .= ':' . $this->getState('filter.scope');
-        $id .= ':' . $this->getState('filter.affiliation');
+        $id .= ':' . $this->getState('filter.list_type');
 
         return parent::getStoreId($id);
     }
 
-    protected function getListQuery()
+    protected function getListQuery(): QueryInterface
     {
-        $items = $this;
-        $items->getQuery();
+        $db = $this->resolveDb();
 
-        // Select the required fields from the table.
-        $items->query->select([
-            $this->db->quoteName('id'),
-            $this->db->quoteName('original'),
-            $this->db->quoteName('scope'),
-            $this->db->quoteName('affiliation'),
-            $this->db->quoteName('state'),
+        $this->getQuery();
+        $this->setFrom();
+        $query = $this->query;
+
+        $query->select([
+            $db->quoteName('a.id'),
+            $db->quoteName('a.list_name'),
+            $db->quoteName('a.list_type'),
+            $db->quoteName('a.state'),
+            $db->quoteName('a.created'),
         ]);
-        $items->setFrom($items->query, alias: 'm');
 
-        $this->setListOrdering($items);
-        $this->setPublishedState($items);
+        // An unset filter shows published and unpublished but not trashed.
+        $this->setPublishedState($this, ['column' => 'a.state', 'default' => [0, 1]]);
 
-        // Column filters from the filter bar
-        $this->setFilterColumn($items, 'scope');
-        $this->setFilterColumn($items, 'affiliation');
+        $this->setFilterColumn($this, 'list_type');
 
-        // ALWAYS last — see the setFilterSearch() rule below
-        $this->setFilterSearch($items, $this->haystack);
+        $this->setListOrdering($this, null, ['column' => 'a.id', 'direction' => 'DESC']);
 
-        return $items->query;
+        // ALWAYS last — see the setFilterSearch() rule below. The id: form is alias-qualified
+        // because a joined table may also carry an id.
+        $this->setFilterSearch($this, $this->haystack, 'a.id');
+
+        return $query;
+    }
+}
+```
+
+The two setters live on `LocalTraits` beside the query helpers, and the trait declares the backing
+property so `$this->haystack` is never a dynamic property:
+
+```php
+trait LocalTraits
+{
+    protected ?array $haystack = null;
+
+    /** Sets the filter_fields allow list used by ListModel::populateState(). */
+    public function setFilterFields(array $fields): void
+    {
+        $this->filter_fields = $fields;
+    }
+
+    /** Sets the columns setFilterSearch() matches against with LIKE. */
+    public function setHaystack(array $fields): void
+    {
+        $this->haystack = $fields;
     }
 }
 ```
@@ -508,7 +584,9 @@ class MapsModel extends ListModel
 | `setListOrdering(?object $model, ?array $options, array $default)` | `ORDER BY` from `list.ordering` / `list.direction` state, with a default |
 | `setPublishedState(?object $model, ?array $options)` | `WHERE state = :state` from `filter.published`; skipped for `*` or non-numeric |
 | `setFilterColumn(object $model, string $column)` | `WHERE {column} = :{column}` from `filter.{column}`; skipped when null/empty |
-| `setFilterSearch(?object $model, ?array $haystack)` | `id:N` lookup, otherwise `LIKE` across every haystack column, OR-grouped |
+| `setFilterSearch(?object $model, ?array $haystack, string $idColumn = 'id')` | `id:N` lookup, otherwise `LIKE` across every haystack column, OR-grouped; alias-qualify $idColumn when the query joins another table that also carries an `id` |
+| `setFilterFields(array $fields)` | Public setter — the View pushes its `filter_fields` allow list in before `getItems()` |
+| `setHaystack(array $fields)` | Public setter — the View pushes its search-column list in before `getItems()` |
 | `sqlDump($query)` | Resolved SQL for debugging — see below |
 
 **Rules**
@@ -523,8 +601,15 @@ class MapsModel extends ListModel
   `setFilterSearch()` last. See the next section for why search must be last.
 - **`getStoreId()` mirrors the filters.** Every filter applied in `getListQuery()` gets a line in
   `getStoreId()`, or cached results leak between filter states.
-- **`filter_fields`** in the constructor config must list every sortable column, or
-  `list.ordering` is silently rejected by `ListModel::populateState()`.
+- **`filter_fields` and `haystack` are set by the View**, never through `$config` in the model
+  constructor and never hard-coded in the model — `$model->setFilterFields()` and
+  `$model->setHaystack()` are called in `HtmlView::display()` **before** `getItems()`, because
+  `getItems()` triggers `populateState()` and the ordering check.
+- **`filter_fields`** must list every sortable column offered by `searchtools.sort` in the
+  template, in both bare and alias-qualified form (`'id', 'a.id'`), or `list.ordering` is
+  silently rejected by `ListModel::populateState()` and the heading looks sortable while doing
+  nothing. It is an allow list, not documentation: `setListOrdering()` puts the column into
+  `ORDER BY` through `escape()`, which does not make an identifier safe.
 - **No leftover debug.** Never commit `$x = $items->query->dump();` — use `sqlDump()` while
   debugging and remove it before commit.
 - Site/API/CLI list models **extend the Administrator list model** and override only the extra

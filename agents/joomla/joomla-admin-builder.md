@@ -631,7 +631,13 @@ class TrolleyController extends AdminController {
   `setListOrdering()` → `setPublishedState()` → one `setFilterColumn()` per filter-bar column →
   `setFilterSearch()` last. No inline `if`/`where()`/`bind()` blocks in the model. A filter that no
   existing helper covers gets a **new named helper added to `LocalTraits`**, not inline logic.
-  Mirror every applied filter in `getStoreId()`. Reference implementation: `com_mapper`'s `MapsModel`.
+  Mirror every applied filter in `getStoreId()`. Reference implementation: `com_inventorydata`'s
+  `Savedlists` view/model pair.
+- **`filter_fields` and `haystack` live on the View, not the model.** The list `HtmlView` declares
+  both arrays and calls `$model->setFilterFields()` / `$model->setHaystack()` in `display()`
+  **before** `getItems()`. Never pass them via `$config` in the model constructor and never
+  hard-code them in the model — see *Preferred `getListQuery()` Pattern* in
+  `includes/joomla-coding-preferences.md`.
 - Every list model that builds a query MUST `use LocalTraits;` and declare `protected string $_tbl`
 - **Form models**: Extend `AdminModel` — implement `getForm()`, `getItem()`, `save()`, validation rules
 - **NEVER** use string concatenation in queries — always use `$db->quoteName()` and bound parameters
@@ -668,11 +674,36 @@ class HtmlView extends BaseHtmlView
     public $filterForm;
     public $activeFilters;
 
+    /**
+     * Columns the list may be ordered and filtered by. An allow list, not documentation:
+     * ListModel::populateState() refuses any list.ordering absent here. Every column offered
+     * by searchtools.sort in the template must appear, bare and alias-qualified.
+     */
+    private array $filter_fields = [
+        'id', 'a.id',
+        'title', 'a.title',
+        'state', 'a.state',
+        'ordering', 'a.ordering',
+        'created', 'a.created',
+    ];
+
+    /** Columns the search box matches against with LIKE. */
+    private array $haystack = [
+        'a.title',
+        'a.alias',
+    ];
+
     #[\Override]
     public function display($tpl = null): void
     {
         // CORRECT: Direct model calls — NEVER use $this->get('Items')
         $model              = $this->getModel();
+
+        // Both lists belong to the View, beside the template they describe. MUST precede
+        // getItems(), which triggers populateState() and the ordering check.
+        $model->setFilterFields($this->filter_fields);
+        $model->setHaystack($this->haystack);
+
         $this->items        = $model->getItems();
         $this->pagination   = $model->getPagination();
         $this->state        = $model->getState();

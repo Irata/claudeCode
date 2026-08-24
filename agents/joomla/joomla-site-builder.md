@@ -341,7 +341,9 @@ public function save($key = null, $urlVar = null): void
 - **Never rebuild the query.** A site list model calls `parent::getListQuery()` and adds only the
   site-specific clause. When that clause needs more than a one-line `where()`, add a named helper to
   the component's `LocalTraits` and call it — the same preferred pattern the Administrator model
-  uses (`includes/joomla-coding-preferences.md` → *Preferred `getListQuery()` Pattern*). Any added
+  uses (`includes/joomla-coding-preferences.md` → *Preferred `getListQuery()` Pattern*), including
+  its `filter_fields`/`haystack` ownership: the site list `HtmlView` declares both arrays and calls
+  `$model->setFilterFields()` / `$model->setHaystack()` before `getItems()`. Any added
   filter must also be reflected in the site model's `getStoreId()`.
 - Always filter by `published = 1` and access level for site views
 - Implement hit counting where appropriate

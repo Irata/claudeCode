@@ -340,6 +340,33 @@ ALTER TABLE `#__example` ADD INDEX idx_state (`state`) /** CAN FAIL **/;
 - `MODIFY` / `CHANGE` and `DROP TABLE IF EXISTS` are already idempotent and do not need it.
 - Empty `.sql` files are harmless — only a `file_get_contents()` of `false` aborts, and an empty buffer simply yields no queries. They are valid as version markers.
 
+#### Database → Fix Runs Only DDL — Never Depend on a Non-DDL Statement
+
+A package install executes **every** statement in an update file. `System → Database → Fix` does not, and the difference will silently half-apply a file that looked correct.
+
+`ChangeSet::fix()` iterates `$this->changeItems`, and a `ChangeItem` exists only for a statement `MysqlChangeItem::buildCheckQuery()` can build a check query for — `RENAME TABLE`, `ALTER TABLE` and `CREATE TABLE`. An `UPDATE`, `INSERT` or `DELETE` has no check query, so it never becomes a change item, so **Fix never runs it**. Fix then stamps `#__schemas` at the newest filename regardless, so the site reports itself up to date while the schema is wrong.
+
+The classic casualty is backfill-then-constrain:
+
+```sql
+-- WRONG: only the first and last statements survive Database → Fix
+ALTER TABLE `#__example` ADD COLUMN `created` datetime NULL /** CAN FAIL **/;
+UPDATE `#__example` SET `created` = UTC_TIMESTAMP() WHERE `created` IS NULL;
+ALTER TABLE `#__example` MODIFY `created` datetime NOT NULL;
+```
+
+The column is added nullable, the backfill is skipped, and the `MODIFY` then fails against the rows still holding `NULL`. The visible symptom is a Database Check reporting *"has the wrong type or attributes for column …"* against a file that installs perfectly.
+
+> **Every statement in an update file must be independently correct. No statement may depend on another having run first.**
+
+- **Put the final definition on the `ADD COLUMN`.** That branch of `buildCheckQuery()` verifies the column's **existence only** — no type, null or default comparison — so the full definition can be stated there without the checker second-guessing it.
+- **Choose a `DEFAULT` that gives existing rows the value they should have.** Adding a column applies its default to every existing row, which is the backfill, done in DDL. A `state` column that must not retire existing rows is `default 1`, not `default 0` plus an `UPDATE`.
+- **Do not use `DEFAULT CURRENT_TIMESTAMP` on anything a `MODIFY` will verify.** `checkDefault()` emits `` `default` = CURRENT_TIMESTAMP `` unquoted, comparing the stored default against the *evaluated* function, which never matches. It is also server-local time in a column Joomla reads as UTC.
+- **If a value genuinely cannot be produced by DDL alone, make the column nullable** and let the Table populate it on save via `ensureCreatedDate()` / `ensureModifiedDefaults()`. A `NULL` meaning "unknown" is honest; a fabricated timestamp is not.
+- **Keep `UPDATE` statements only as belt-and-braces** — harmless when they run, never the only path to a correct end state.
+
+Note that this cuts against the "backfill, then constrain" sequencing that is otherwise right for data migrations. Both rules are real: sequence the work that way when a package install is the only path, and accept that any site repaired through Database → Fix needs the DDL to stand on its own.
+
 #### The Install Script Must Be Schema-Complete
 
 Because a fresh install pins `#__schemas` straight to the newest update filename, **update files never run on a fresh install**. The install script is therefore the complete current schema, not the original schema.

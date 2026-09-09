@@ -325,6 +325,47 @@ Writing update files is not enough. Joomla only looks at `sql/updates/{driver}/`
 
 This is not a soft failure. A failing statement makes `parseSchemaUpdates()` return `false`, which makes `parseQueries()` throw `RuntimeException` — **the entire update aborts and rolls back**.
 
+#### A Missing `#__schemas` Row Makes the Extension Invisible to the Database Checker
+
+The same missing row has a second consequence, and it is the reason this class of drift survives for years unnoticed: **`System → Manage → Database` cannot see the extension at all.**
+
+`DatabaseModel::getListQuery()` (`administrator/components/com_installer/src/Model/DatabaseModel.php`) builds its list starting from the schemas table, not the extensions table:
+
+```php
+->from($db->quoteName('#__schemas', 'schemas'))
+->join(
+    'INNER',
+    $db->quoteName('#__extensions', 'extensions'),
+    $db->quoteName('schemas.extension_id') . ' = ' . $db->quoteName('extensions.extension_id')
+)
+```
+
+An `INNER JOIN`. No row in `#__schemas` means no row in the checker — not "up to date", not "has errors", **absent**. The one tool built to report schema drift is the one tool that stays silent about it, and the site reports a clean bill of health while running current code against an original-install table.
+
+**Recovery — seed the row, then use the checker.** Do not reinstall the package to fix this. A reinstall takes the `update` route, replays from `'0.0.0'`, and aborts on the first statement that is not replay-safe. The checker does not: `ChangeItem::fix()` wraps each statement in its own `try`/`catch`, so one failure marks that line and the rest still run.
+
+```sql
+-- Any value works; the checker overwrites it. '0.0.0' is honest about what is known.
+INSERT INTO `#__schemas` (`extension_id`, `version_id`) VALUES (<extension_id>, '0.0.0');
+```
+
+Then `System → Manage → Database → Fix`. Alongside the DDL it also calls `fixSchemaVersion()` (stamps `#__schemas` at the newest update filename) and `fixUpdateVersion()` (corrects `manifest_cache` to the manifest version), so the two version mismatches clear in the same pass.
+
+Two things to expect on that first pass:
+
+- **Statements deliberately repeated across update files fail once and then go green.** `check()` runs before any fix, so both copies are queued; the second `DROP INDEX` finds the index already gone. The next page load re-checks against the repaired table and reports OK. A refresh, not a second diagnosis.
+- **Non-DDL statements are skipped** — see *Database → Fix Runs Only DDL* below. Any dedupe or backfill a file depends on has to be run by hand.
+
+**Verifying before you touch anything.** The checker's own logic runs read-only from the CLI, which tells you exactly what Fix would do:
+
+```php
+$cs = new \Joomla\CMS\Schema\ChangeSet($db, JPATH_ADMINISTRATOR . '/components/com_example/sql/updates');
+$cs->check();                       // never call fix() while investigating
+$st = $cs->getStatus();             // ['ok' => [], 'error' => [], 'skipped' => [], 'unchecked' => []]
+```
+
+Pass the **parent** of the driver folder — `sql/updates`, not `sql/updates/mysql`. `ChangeSet::getUpdateFiles()` appends `getServerType()` itself, and a path that already ends in the driver name silently yields no files and an empty `getSchema()`.
+
 #### Making Update SQL Replay-Safe — `/** CAN FAIL **/`
 
 Plain `ADD COLUMN` / `ADD INDEX` / `DROP COLUMN` statements error when replayed against a database that already has the change. Mark any statement that is safe to skip with Joomla's marker (`Installer::CAN_FAIL_MARKER`, available since Joomla 4.2):
@@ -911,6 +952,8 @@ by `showtime`:
 - The trait file exists in each component's `Model` namespace (same namespace, no import needed)
 - Add `use DebugErrorAwareTrait;` as the first statement inside the class body
 - BaseDatabaseModel subclasses (DataModels, DashboardModel) do NOT need the trait
+
+**The trait is not sufficient on its own.** It enqueues only while `JDEBUG` is active, so with debug off a failed query is still discarded silently — `ListModel::getItems()` catches the exception, calls `setError()` and returns `false`, and the list renders as *"No matching results"*. Every list view must also check `getErrors()` in `display()` and throw. See `includes/joomla-listmodel-error-handling.md`, which also covers the diagnostic fingerprint: empty rows beneath a pagination footer reporting a real total.
 
 ### Sync Save Errors MUST Carry the Offending Record
 

@@ -663,6 +663,7 @@ namespace {Vendor}\Component\{Name}\Administrator\View\{Entities};
 
 use Joomla\CMS\Helper\ContentHelper;
 use Joomla\CMS\Language\Text;
+use Joomla\CMS\MVC\View\GenericDataException;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use Joomla\CMS\Toolbar\ToolbarHelper;
 
@@ -709,6 +710,16 @@ class HtmlView extends BaseHtmlView
         $this->state        = $model->getState();
         $this->filterForm   = $model->getFilterForm();
         $this->activeFilters = $model->getActiveFilters();
+
+        // ListModel catches a failed query, hands it to setError() and returns false —
+        // nothing is enqueued, so a broken list renders as "No matching results". MUST
+        // precede addToolbar(), which walks $this->items and would read a property off
+        // boolean false. See includes/joomla-listmodel-error-handling.md.
+        $errors = $model->getErrors();
+
+        if (\count($errors)) {
+            throw new GenericDataException(implode("\n", $errors), 500);
+        }
 
         $this->addToolbar();
 

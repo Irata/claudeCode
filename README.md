@@ -93,6 +93,7 @@ This means every agent and conversation in the project automatically has access 
 | **joomla-structure-api.md** | Reference directory and file structure for Joomla REST API extensions |
 | **joomla-structure-cli.md** | Reference directory and file structure for Joomla CLI commands, plus the self-documenting console plugin pattern (command reference read from each command's InputDefinition) |
 | **joomla-trash-delete-pattern.md** | List view Trash / Empty Trash toolbar pattern — why a Delete button without a Trash button can never succeed, the two gating variants, and enforcing a higher permission in `canDelete()` rather than in the toolbar |
+| **joomla-listmodel-error-handling.md** | Why a broken list query renders as "No matching results" — `ListModel` swallows the exception into `setError()`, the empty-rows-with-a-real-pagination-count fingerprint that follows from `_getListCount()` clearing the SELECT list, and the `getErrors()` guard every list view needs |
 | **joomla-di-patterns.md** | Dependency injection patterns — service providers, container registration, and factory patterns |
 | **joomla-events-system.md** | Joomla event system — dispatching, subscribing, and event class conventions |
 | **joomla-depreciated.md** | Deprecated Joomla patterns to avoid — legacy APIs, removed features, and migration paths |

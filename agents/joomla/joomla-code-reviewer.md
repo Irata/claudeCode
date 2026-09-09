@@ -1157,6 +1157,16 @@ Flag legacy plugin event patterns and verify that modernizations preserve backwa
   - **Fix**: Add `$toolbar->trash('{entities}.trash')->listCheck(true)` for the normal view
     and show `delete()` relabelled `JTOOLBAR_EMPTY_TRASH` only where trashed records are
     visible. No controller change is needed. See `includes/joomla-trash-delete-pattern.md`.
+- **List view that never checks `getErrors()`**: In a list view's `display()`, flag the absence
+  of an errors check between the model calls and `addToolbar()`. `ListModel::getItems()` and
+  `getTotal()` each catch a failed query, hand the message to `setError()` and return `false` —
+  nothing is enqueued and nothing throws, so a broken query is indistinguishable from an empty
+  result set. `DebugErrorAwareTrait` does not cover this; it enqueues only while `JDEBUG` is on.
+  - **Fix**: `$errors = $model->getErrors(); if (\count($errors)) { throw new
+    GenericDataException(implode("\n", $errors), 500); }`, placed **before** `addToolbar()` — on
+    failure `$this->items` is boolean `false`, and a toolbar loop over it raises "Attempt to read
+    property on bool", masking the real message. See
+    `includes/joomla-listmodel-error-handling.md`.
 - **Empty Trash gated only in the toolbar**: If a component hides its purge button behind a
   permission (commonly `core.admin`) but `canDelete()` still defers to
   `parent::canDelete()`, the restriction is decoration — `AdminModel::delete()` is reachable

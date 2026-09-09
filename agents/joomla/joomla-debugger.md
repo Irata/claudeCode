@@ -128,6 +128,25 @@ Apply the minimum change needed to resolve the issue. Do NOT refactor surroundin
 - Missing `quoteName()` on column/table names
 - SQL syntax errors in update scripts
 
+**A list view showing no rows is a query failure until proven otherwise.** `ListModel::getItems()`
+catches the exception, calls `setError()` and returns `false` — no message is enqueued and nothing
+is logged, so it renders as *"No matching results"* and reads as a data or filter problem. Check
+`$model->getErrors()` before believing the list is empty.
+
+The fingerprint, and the bisection it gives you for free:
+
+| Rows | Pagination total | Where the fault is |
+|---|---|---|
+| empty | **non-zero** | `SELECT` list or `ORDER BY` — `_getListCount()` clones the query and clears both, so the count survives what the list query cannot. Usually a column the table does not have. |
+| empty | zero | `FROM` / `WHERE` / bound parameters — the count keeps those, so both queries fail |
+| empty | zero, and no error | genuinely no matching rows |
+
+A column present in the model but absent from the table almost always means the site's update
+files never ran. Confirm with `SHOW COLUMNS`, then check `#__schemas` for the extension — a
+**missing row there also hides the extension from `System → Manage → Database`**, which is why
+nobody was warned. See `includes/joomla-listmodel-error-handling.md` and the `#__schemas` sections
+of `includes/joomla-coding-preferences.md`.
+
 ### ACL / Permissions
 - Missing `authorise()` checks in controllers
 - Incorrect action names in `access.xml`
